@@ -1,9 +1,10 @@
 {
   "name": "js-hw",
   "version": "1.0.0",
-  "main": "main.js",
+  "type": "commonjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start:gen": "node log-generator.js",
+    "start:analyze": "node log-analyzer.js"
   },
   "repository": {
     "type": "git",
@@ -15,5 +16,6 @@
     "url": "https://github.com/ArKoWol/node-js-HW/issues"
   },
   "homepage": "https://github.com/ArKoWol/node-js-HW#readme",
-  "description": ""
+  "description": "",
+  "dependencies": {}
 }
