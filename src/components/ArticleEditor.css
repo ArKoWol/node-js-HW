@@ -1,0 +1,166 @@
+.article-editor-container {
+  max-width: 900px;
+  margin: 0 auto;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.editor-header {
+  margin-bottom: 2rem;
+}
+
+.editor-header h2 {
+  font-size: 1.8rem;
+  color: #2d3748;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.editor-header p {
+  color: #718096;
+  font-size: 1rem;
+}
+
+.editor-form {
+  background: white;
+  border-radius: 12px;
+  padding: 2.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.form-group {
+  margin-bottom: 2rem;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+
+.required {
+  color: #e53e3e;
+  margin-left: 0.25rem;
+}
+
+.form-group input[type='text'] {
+  width: 100%;
+  padding: 0.875rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.form-group input[type='text']:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-group input[type='text']:disabled {
+  background: #f7fafc;
+  cursor: not-allowed;
+}
+
+.input-error {
+  border-color: #e53e3e !important;
+}
+
+.input-error:focus {
+  box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.1) !important;
+}
+
+.error-text {
+  display: block;
+  color: #e53e3e;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+/* React Quill customization */
+.quill {
+  background: white;
+}
+
+.ql-container {
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+.ql-toolbar {
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  background: #f7fafc;
+  border: 2px solid #e2e8f0 !important;
+}
+
+.ql-container {
+  border: 2px solid #e2e8f0 !important;
+  border-top: none !important;
+  min-height: 300px;
+}
+
+.ql-editor {
+  min-height: 300px;
+}
+
+.ql-editor.ql-blank::before {
+  color: #a0aec0;
+  font-style: normal;
+}
+
+.editor-error .ql-toolbar,
+.editor-error .ql-container {
+  border-color: #e53e3e !important;
+}
+
+/* Form actions */
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 2px solid #e2e8f0;
+  margin-top: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .editor-form {
+    padding: 1.5rem;
+  }
+
+  .editor-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .form-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .ql-editor {
+    min-height: 250px;
+  }
+}
+

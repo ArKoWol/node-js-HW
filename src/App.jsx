@@ -1,0 +1,151 @@
+import { useState, useEffect } from 'react';
+import './App.css';
+import ArticleList from './components/ArticleList';
+import ArticleView from './components/ArticleView';
+import ArticleEditor from './components/ArticleEditor';
+
+const API_URL = 'http://localhost:3000/api';
+
+function App() {
+  const [view, setView] = useState('list');
+  const [articles, setArticles] = useState([]);
+  const [selectedArticle, setSelectedArticle] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchArticles();
+  }, []);
+
+  const fetchArticles = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/articles`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch articles');
+      }
+      const data = await response.json();
+      setArticles(data.articles || []);
+    } catch (err) {
+      setError(err.message);
+      console.error('Error fetching articles:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleArticleClick = async (articleId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/articles/${articleId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch article');
+      }
+      const data = await response.json();
+      setSelectedArticle(data.article);
+      setView('view');
+    } catch (err) {
+      setError(err.message);
+      console.error('Error fetching article:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateArticle = async (articleData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/articles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(articleData),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.errors ? data.errors.join(', ') : data.error || 'Failed to create article');
+      }
+
+      await fetchArticles();
+      setView('list');
+      return { success: true };
+    } catch (err) {
+      setError(err.message);
+      console.error('Error creating article:', err);
+      return { success: false, error: err.message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBackToList = () => {
+    setView('list');
+    setSelectedArticle(null);
+    setError(null);
+  };
+
+  const handleCreateNew = () => {
+    setView('create');
+    setError(null);
+  };
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <div className="header-content">
+          <h1>Article Management System</h1>
+          {view !== 'list' && (
+            <button className="btn btn-secondary" onClick={handleBackToList}>
+              ← Back to List
+            </button>
+          )}
+        </div>
+      </header>
+
+      <main className="app-main">
+        {error && (
+          <div className="error-banner">
+            <span>{error}</span>
+            <button onClick={() => setError(null)}>✕</button>
+          </div>
+        )}
+
+        {view === 'list' && (
+          <ArticleList
+            articles={articles}
+            loading={loading}
+            onArticleClick={handleArticleClick}
+            onCreateNew={handleCreateNew}
+          />
+        )}
+
+        {view === 'view' && selectedArticle && (
+          <ArticleView
+            article={selectedArticle}
+            loading={loading}
+          />
+        )}
+
+        {view === 'create' && (
+          <ArticleEditor
+            onSubmit={handleCreateArticle}
+            onCancel={handleBackToList}
+            loading={loading}
+          />
+        )}
+      </main>
+
+      <footer className="app-footer">
+        <p>Article count: {articles.length}</p>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
