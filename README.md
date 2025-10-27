@@ -15,8 +15,13 @@ Full-stack application for managing articles with React frontend and Node.js bac
 ## Installation
 
 ```bash
+# Install frontend dependencies (use --legacy-peer-deps due to React 19)
 npm install --legacy-peer-deps
-cd backend && npm install && cd ..
+
+# Install backend dependencies
+cd backend
+npm install
+cd ..
 ```
 
 ## Running the Application
@@ -25,13 +30,23 @@ cd backend && npm install && cd ..
 
 **Windows:**
 ```bash
+# Start both servers
 start-servers.bat
+
+# Stop servers (in another terminal)
+stop-servers.bat
 ```
 
 **macOS/Linux:**
 ```bash
-chmod +x start-servers.sh
+# Make scripts executable (first time only)
+chmod +x start-servers.sh stop-servers.sh
+
+# Start both servers
 ./start-servers.sh
+
+# Stop servers: Press Ctrl+C or run in another terminal:
+./stop-servers.sh
 ```
 
 ### Manual Start
@@ -126,6 +141,8 @@ The application includes 3 pre-loaded sample articles demonstrating various cont
 ## Troubleshooting
 
 **Port already in use:**
+
+macOS/Linux:
 ```bash
 # Kill process on port 3000
 lsof -ti:3000 | xargs kill -9
@@ -134,10 +151,34 @@ lsof -ti:3000 | xargs kill -9
 lsof -ti:5173 | xargs kill -9
 ```
 
-**Dependencies issue:**
+Windows:
 ```bash
-rm -rf node_modules package-lock.json
+# Kill process on port 3000
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
+
+# Kill process on port 5173
+netstat -ano | findstr :5173
+taskkill /PID <PID> /F
+```
+
+**Dependencies issue:**
+
+macOS/Linux:
+```bash
+rm -rf node_modules package-lock.json backend/node_modules backend/package-lock.json
 npm install --legacy-peer-deps
+cd backend && npm install
+```
+
+Windows:
+```bash
+rmdir /s /q node_modules
+del package-lock.json
+rmdir /s /q backend\node_modules
+del backend\package-lock.json
+npm install --legacy-peer-deps
+cd backend && npm install
 ```
 
 **Backend not responding:**
@@ -167,7 +208,6 @@ npm run dev      # Start with auto-restart
 
 ## Notes
 
-- Articles stored as individual JSON files in `backend/data/`
-- Filenames: `{timestamp}-{title-slug}.json`
-- React Quill New used for React 19 compatibility
-- Use `--legacy-peer-deps` flag for npm install due to React 19
+- Articles are stored as individual JSON files in `backend/data/`
+- Filename format: `{timestamp}-{title-slug}.json`
+- Sample data included for testing
