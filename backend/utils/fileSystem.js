@@ -2,10 +2,10 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const currentFilePath = fileURLToPath(import.meta.url);
+const currentDir = path.dirname(currentFilePath);
 
-export const DATA_DIR = path.join(__dirname, '..', 'data');
+export const DATA_DIR = path.join(currentDir, '..', 'data');
 
 export async function initializeDataDirectory() {
   try {

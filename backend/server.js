@@ -1,7 +1,14 @@
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import articlesRouter from './routes/articles.js';
 import { initializeDataDirectory } from './utils/fileSystem.js';
+
+const currentFilePath = fileURLToPath(import.meta.url);
+const currentDir = path.dirname(currentFilePath);
+dotenv.config({ path: path.join(currentDir, '..', '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
