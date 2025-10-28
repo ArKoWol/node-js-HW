@@ -15,8 +15,7 @@ Full-stack application for managing articles with React frontend and Node.js bac
 ## Installation
 
 ```bash
-# Install frontend dependencies (use --legacy-peer-deps due to React 19)
-npm install --legacy-peer-deps
+npm install 
 
 # Install backend dependencies
 cd backend
