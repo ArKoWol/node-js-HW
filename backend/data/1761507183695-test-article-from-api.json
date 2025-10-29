@@ -1,0 +1,8 @@
+{
+  "id": "article-1761507183695-gcjk2ku",
+  "title": "Test Article from API",
+  "content": "<p>This is a test article created via <strong>curl</strong>. It demonstrates that the API is working correctly.</p>",
+  "author": "API Tester",
+  "createdAt": "2025-10-26T19:33:03.695Z",
+  "updatedAt": "2025-10-26T19:33:03.695Z"
+}
