@@ -4,7 +4,9 @@ import {
   readArticleFile,
   writeArticleFile,
   generateFilename,
-  articleFileExists
+  articleFileExists,
+  findFileByArticleId,
+  deleteArticleFile
 } from '../utils/fileSystem.js';
 
 const router = express.Router();
@@ -127,6 +129,88 @@ router.post('/', async (req, res, next) => {
       success: true,
       message: 'Article created successfully',
       article
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { title, content, author } = req.body;
+    
+    // Find the existing article file
+    const filename = await findFileByArticleId(id);
+    if (!filename) {
+      return res.status(404).json({
+        success: false,
+        error: 'Article not found',
+        status: 404
+      });
+    }
+    
+    // Validate the updated article data
+    const errors = validateArticle({ title, content });
+    if (errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors,
+        status: 400
+      });
+    }
+    
+    // Read the existing article to preserve fields
+    const existingArticle = await readArticleFile(filename);
+    
+    // Update the article with new data
+    const updatedArticle = {
+      ...existingArticle,
+      title: title.trim(),
+      content: content.trim(),
+      author: author?.trim() || existingArticle.author || 'Anonymous',
+      updatedAt: new Date().toISOString()
+    };
+    
+    // Write the updated article back to the same file
+    await writeArticleFile(filename, updatedArticle);
+    
+    console.log(`Article updated: ${id} (${filename})`);
+    
+    res.json({
+      success: true,
+      message: 'Article updated successfully',
+      article: updatedArticle
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    // Find the article file
+    const filename = await findFileByArticleId(id);
+    if (!filename) {
+      return res.status(404).json({
+        success: false,
+        error: 'Article not found',
+        status: 404
+      });
+    }
+    
+    // Delete the article file
+    await deleteArticleFile(filename);
+    
+    console.log(`Article deleted: ${id} (${filename})`);
+    
+    res.json({
+      success: true,
+      message: 'Article deleted successfully',
+      deletedId: id
     });
   } catch (error) {
     next(error);

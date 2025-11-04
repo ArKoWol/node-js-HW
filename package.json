@@ -7,9 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
     "start:gen": "node log-generator.js",
     "start:analyze": "node log-analyzer.js"
+  },
   "dependencies": {
     "prop-types": "^15.8.1",
     "react": "^19.1.1",
@@ -26,13 +27,12 @@
     "eslint-plugin-react-refresh": "^0.4.22",
     "globals": "^16.4.0",
     "vite": "^7.1.7"
-  }
+  },
   "author": "",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/ArKoWol/node-js-HW/issues"
   },
   "homepage": "https://github.com/ArKoWol/node-js-HW#readme",
-  "description": "",
-  "dependencies": {}
+  "description": ""
 }

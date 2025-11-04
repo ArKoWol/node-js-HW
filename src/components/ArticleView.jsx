@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import './ArticleView.css';
 
-function ArticleView({ article, loading }) {
+function ArticleView({ article, loading, onEdit, onDelete }) {
   if (loading) {
     return (
       <div className="loading-container">
@@ -37,11 +37,38 @@ function ArticleView({ article, loading }) {
               })}
             </span>
           </div>
+          {article.updatedAt && article.updatedAt !== article.createdAt && (
+            <div className="article-updated">
+              Last updated: {new Date(article.updatedAt).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </div>
+          )}
         </header>
         <div 
           className="article-body"
           dangerouslySetInnerHTML={{ __html: article.content }}
         />
+        <div className="article-actions">
+          <button 
+            className="btn btn-primary" 
+            onClick={onEdit}
+            disabled={loading}
+          >
+            Edit Article
+          </button>
+          <button 
+            className="btn btn-danger" 
+            onClick={() => onDelete(article.id)}
+            disabled={loading}
+          >
+            Delete Article
+          </button>
+        </div>
       </article>
     </div>
   );
@@ -54,8 +81,11 @@ ArticleView.propTypes = {
     content: PropTypes.string.isRequired,
     author: PropTypes.string.isRequired,
     createdAt: PropTypes.string.isRequired,
+    updatedAt: PropTypes.string,
   }),
   loading: PropTypes.bool.isRequired,
+  onEdit: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
 };
 
 export default ArticleView;

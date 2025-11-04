@@ -84,6 +84,66 @@ function App() {
     }
   };
 
+  const handleEditArticle = async (articleId, articleData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/articles/${articleId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(articleData),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.errors ? data.errors.join(', ') : data.error || 'Failed to update article');
+      }
+
+      await fetchArticles();
+      setSelectedArticle(data.article);
+      setView('view');
+      return { success: true };
+    } catch (err) {
+      setError(err.message);
+      console.error('Error updating article:', err);
+      return { success: false, error: err.message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteArticle = async (articleId) => {
+    if (!window.confirm('Are you sure you want to delete this article? This action cannot be undone.')) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/articles/${articleId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete article');
+      }
+
+      await fetchArticles();
+      setView('list');
+      setSelectedArticle(null);
+    } catch (err) {
+      setError(err.message);
+      console.error('Error deleting article:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleBackToList = () => {
     setView('list');
     setSelectedArticle(null);
@@ -92,6 +152,11 @@ function App() {
 
   const handleCreateNew = () => {
     setView('create');
+    setError(null);
+  };
+
+  const handleEditMode = () => {
+    setView('edit');
     setError(null);
   };
 
@@ -129,6 +194,8 @@ function App() {
           <ArticleView
             article={selectedArticle}
             loading={loading}
+            onEdit={handleEditMode}
+            onDelete={handleDeleteArticle}
           />
         )}
 
@@ -137,6 +204,16 @@ function App() {
             onSubmit={handleCreateArticle}
             onCancel={handleBackToList}
             loading={loading}
+          />
+        )}
+
+        {view === 'edit' && selectedArticle && (
+          <ArticleEditor
+            article={selectedArticle}
+            onSubmit={(data) => handleEditArticle(selectedArticle.id, data)}
+            onCancel={() => setView('view')}
+            loading={loading}
+            isEdit
           />
         )}
       </main>
