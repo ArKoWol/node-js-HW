@@ -4,8 +4,8 @@ Full-stack application for managing articles with React frontend and Node.js bac
 
 ## Tech Stack
 
-**Frontend**: React 19, Vite, React Quill New (WYSIWYG editor)  
-**Backend**: Node.js, Express, File-based storage (JSON)
+**Frontend**: React 19, Vite, React Quill New (WYSIWYG editor), WebSocket  
+**Backend**: Node.js, Express, WebSocket (ws), Multer, File-based storage (JSON)
 
 ## Prerequisites
 
@@ -65,14 +65,25 @@ npm run dev
 
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:3000/api
+- WebSocket: ws://localhost:3000/ws
 
 ## API Endpoints
 
+### Articles
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/articles` | List all articles |
 | GET | `/api/articles/:id` | Get specific article |
 | POST | `/api/articles` | Create new article |
+| PUT | `/api/articles/:id` | Update article |
+| DELETE | `/api/articles/:id` | Delete article |
+
+### Attachments
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/articles/:id/attachments` | Upload file attachment |
+| GET | `/api/articles/:id/attachments/:attachmentId` | View/download attachment |
+| DELETE | `/api/articles/:id/attachments/:attachmentId` | Delete attachment |
 
 ### Create Article Example
 
@@ -86,19 +97,25 @@ curl -X POST http://localhost:3000/api/articles \
 
 ```
 ├── backend/
-│   ├── server.js           # Express server
+│   ├── server.js              # Express + WebSocket server
 │   ├── routes/
-│   │   └── articles.js     # API routes
+│   │   └── articles.js        # API routes + file upload
 │   ├── utils/
-│   │   └── fileSystem.js   # File operations
-│   └── data/               # Article storage (JSON files)
+│   │   ├── fileSystem.js      # File operations
+│   │   └── websocket.js       # WebSocket notifications
+│   └── data/
+│       ├── *.json             # Article storage
+│       └── attachments/       # File attachments
 ├── src/
-│   ├── App.jsx             # Main app component
+│   ├── App.jsx                # Main app + WebSocket integration
 │   ├── components/
 │   │   ├── ArticleList.jsx
-│   │   ├── ArticleView.jsx
-│   │   └── ArticleEditor.jsx
-│   └── *.css               # Component styles
+│   │   ├── ArticleView.jsx    # + attachment display
+│   │   ├── ArticleEditor.jsx  # + file upload UI
+│   │   └── NotificationDisplay.jsx  # Real-time notifications
+│   ├── hooks/
+│   │   └── useWebSocket.js    # WebSocket hook
+│   └── *.css                  # Component styles
 └── package.json
 ```
 
@@ -107,18 +124,41 @@ curl -X POST http://localhost:3000/api/articles \
 ### Backend
 - RESTful API with Express
 - File-based storage (JSON)
-- Input validation (title, content)
+- Input validation (title, content, files)
 - Error handling
 - CORS enabled
+- **📎 File attachments with Multer**
+  - Support for images (JPG, PNG, GIF, WEBP) and PDFs
+  - File type validation
+  - 10MB size limit
+  - Secure file storage
+- **🔔 WebSocket real-time notifications**
+  - Article creation/update/deletion notifications
+  - File attachment notifications
+  - Auto-reconnection
+  - Multi-client broadcast
 
 ### Frontend
 - Article list view (card grid)
 - Article detail view
-- WYSIWYG editor for creating articles
+- WYSIWYG editor for creating/editing articles
 - Form validation
 - Error handling with user-friendly messages
 - Loading states
 - Responsive design
+- **📎 File attachment features**
+  - Upload files to articles (images & PDFs)
+  - View attachments at top of article (Outlook-style)
+  - Click to open attachments in new tab
+  - Delete attachments
+  - File type and size validation
+- **🔔 Real-time notifications**
+  - Toast-style notifications
+  - Auto-dismiss after 5 seconds
+  - Manual close option
+  - Color-coded by notification type
+  - WebSocket connection status indicator
+  - Auto-refresh on updates
 
 ## Validation Rules
 
@@ -210,3 +250,36 @@ npm run dev      # Start with auto-restart
 - Articles are stored as individual JSON files in `backend/data/`
 - Filename format: `{timestamp}-{title-slug}.json`
 - Sample data included for testing
+- File attachments are stored in `backend/data/attachments/`
+- Attachment filename format: `{articleId}_{timestamp}_{originalName}`
+- WebSocket runs on the same port as HTTP server at path `/ws`
+
+## New Features Guide
+
+### Using File Attachments
+
+1. **Upload files:**
+   - Create or edit an article
+   - Click "Add File" button in the editor
+   - Select an image (JPG, PNG, GIF, WEBP) or PDF (max 10MB)
+   - File uploads immediately and appears in the list
+
+2. **View attachments:**
+   - Open any article
+   - Attachments are displayed at the top
+   - Click any attachment to view/download it
+
+3. **Delete attachments:**
+   - Edit the article
+   - Click the 🗑️ button next to any attachment
+
+### Real-Time Notifications
+
+- Notifications appear automatically in the top-right corner
+- They show when:
+  - Articles are created, updated, or deleted
+  - Files are attached or removed
+- Notifications auto-dismiss after 5 seconds
+- Click ✕ to dismiss manually
+- WebSocket status indicator in header shows connection status
+

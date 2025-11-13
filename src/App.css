@@ -151,6 +151,73 @@ body {
   }
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.websocket-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.websocket-status.connected {
+  color: #48bb78;
+}
+
+.websocket-status.disconnected {
+  color: #fc8181;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.websocket-status.connected .status-indicator {
+  background: #48bb78;
+  box-shadow: 0 0 8px #48bb78;
+}
+
+.websocket-status.disconnected .status-indicator {
+  background: #fc8181;
+  box-shadow: 0 0 8px #fc8181;
+  animation: none;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+}
+
+.notification-container {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.notification-container > div {
+  pointer-events: all;
+}
+
 @media (max-width: 768px) {
   .app-header {
     padding: 1rem;
@@ -167,6 +234,21 @@ body {
   .btn {
     padding: 0.6rem 1rem;
     font-size: 0.9rem;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .notification-container {
+    left: 0;
+    right: 0;
+  }
+  
+  .notification {
+    margin: 0 10px;
+    max-width: calc(100% - 20px);
   }
 }
 

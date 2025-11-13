@@ -6,6 +6,7 @@ const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
 
 export const DATA_DIR = path.join(currentDir, '..', 'data');
+export const ATTACHMENTS_DIR = path.join(DATA_DIR, 'attachments');
 
 export async function initializeDataDirectory() {
   try {
@@ -14,6 +15,14 @@ export async function initializeDataDirectory() {
   } catch (error) {
     console.log('Creating data directory:', DATA_DIR);
     await fs.mkdir(DATA_DIR, { recursive: true });
+  }
+  
+  try {
+    await fs.access(ATTACHMENTS_DIR);
+    console.log('Attachments directory exists:', ATTACHMENTS_DIR);
+  } catch (error) {
+    console.log('Creating attachments directory:', ATTACHMENTS_DIR);
+    await fs.mkdir(ATTACHMENTS_DIR, { recursive: true });
   }
 }
 
@@ -47,19 +56,29 @@ export async function articleFileExists(filename) {
   }
 }
 
-export function generateFilename(title) {
-  const timestamp = Date.now();
+export function generateFilename(title, articleId) {
   const safeName = title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .substring(0, 50);
-  return `${timestamp}-${safeName}.json`;
+  return `${articleId}__${safeName}.json`;
+}
+
+export function getFilenameFromArticleId(articleId) {
+  return `${articleId}__`;
 }
 
 export async function findFileByArticleId(articleId) {
   try {
     const files = await getAllArticleFiles();
+    const prefix = getFilenameFromArticleId(articleId);
+    
+    const matchingFile = files.find(file => file.startsWith(prefix));
+    
+    if (matchingFile) {
+      return matchingFile;
+    }
     
     for (const file of files) {
       try {
@@ -82,5 +101,40 @@ export async function findFileByArticleId(articleId) {
 export async function deleteArticleFile(filename) {
   const filePath = path.join(DATA_DIR, filename);
   await fs.unlink(filePath);
+}
+
+export async function saveAttachment(file, articleId) {
+  const timestamp = Date.now();
+  const sanitizedFilename = file.originalname
+    .replace(/[^a-zA-Z0-9.-]/g, '_')
+    .substring(0, 100);
+  const filename = `${articleId}_${timestamp}_${sanitizedFilename}`;
+  const filePath = path.join(ATTACHMENTS_DIR, filename);
+  
+  await fs.writeFile(filePath, file.buffer);
+  
+  return {
+    id: `attachment-${timestamp}`,
+    filename: sanitizedFilename,
+    storedFilename: filename,
+    mimeType: file.mimetype,
+    size: file.size,
+    uploadedAt: new Date().toISOString()
+  };
+}
+
+export async function deleteAttachment(storedFilename) {
+  const filePath = path.join(ATTACHMENTS_DIR, storedFilename);
+  try {
+    await fs.unlink(filePath);
+    return true;
+  } catch (error) {
+    console.error('Error deleting attachment:', error);
+    return false;
+  }
+}
+
+export async function getAttachmentPath(storedFilename) {
+  return path.join(ATTACHMENTS_DIR, storedFilename);
 }
 

@@ -3,8 +3,10 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import express from 'express';
 import cors from 'cors';
+import http from 'http';
 import articlesRouter from './routes/articles.js';
 import { initializeDataDirectory } from './utils/fileSystem.js';
+import { initializeWebSocket } from './utils/websocket.js';
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
@@ -37,8 +39,12 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Route not found', status: 404 });
 });
 
-app.listen(PORT, () => {
+const server = http.createServer(app);
+initializeWebSocket(server);
+
+server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
   console.log(`Articles API available at http://localhost:${PORT}/api/articles`);
+  console.log(`WebSocket server available at ws://localhost:${PORT}/ws`);
 });
 

@@ -1,9 +1,8 @@
 {
   "id": "article-1730000100000-sample2",
-  "title": "Node.js Best Practices",
-  "content": "<h1>Node.js Best Practices</h1><p>Node.js is a powerful runtime for building server-side applications. Here are some best practices to follow:</p><h2>1. Use Environment Variables</h2><p>Always use environment variables for configuration. Never hardcode sensitive information like API keys or database credentials.</p><h2>2. Handle Errors Properly</h2><p>Implement proper error handling middleware in Express applications. Use try-catch blocks for async operations.</p><h2>3. Use async/await</h2><p>Modern JavaScript with async/await makes asynchronous code much more readable than callbacks or promises chains.</p><h2>4. Keep Dependencies Updated</h2><p>Regularly update your dependencies to get security patches and new features.</p><p>Following these practices will help you build robust and maintainable applications.</p>",
-  "author": "Developer",
+  "title": "Backward Compatible Edit",
+  "content": "<p>Old file edited successfully</p>",
+  "author": "Tester",
   "createdAt": "2025-10-26T11:30:00.000Z",
-  "updatedAt": "2025-10-26T11:30:00.000Z"
+  "updatedAt": "2025-11-12T16:44:07.663Z"
 }
-

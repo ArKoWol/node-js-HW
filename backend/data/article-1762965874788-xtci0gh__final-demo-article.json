@@ -1,0 +1,18 @@
+{
+  "id": "article-1762965874788-xtci0gh",
+  "title": "Final Demo Article",
+  "content": "<p>This demonstrates the optimized format</p>",
+  "author": "Demo",
+  "createdAt": "2025-11-12T16:44:34.789Z",
+  "updatedAt": "2025-11-13T15:08:26.424Z",
+  "attachments": [
+    {
+      "id": "attachment-1763046506417",
+      "filename": "Game_Die.png",
+      "storedFilename": "article-1762965874788-xtci0gh_1763046506417_Game_Die.png",
+      "mimeType": "image/png",
+      "size": 6111,
+      "uploadedAt": "2025-11-13T15:08:26.424Z"
+    }
+  ]
+}

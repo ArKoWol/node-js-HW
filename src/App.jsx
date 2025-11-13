@@ -3,6 +3,8 @@ import './App.css';
 import ArticleList from './components/ArticleList';
 import ArticleView from './components/ArticleView';
 import ArticleEditor from './components/ArticleEditor';
+import NotificationDisplay from './components/NotificationDisplay';
+import { useWebSocket } from './hooks/useWebSocket';
 
 const API_URL = 'http://localhost:3000/api';
 
@@ -12,10 +14,37 @@ function App() {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
     fetchArticles();
   }, []);
+
+  const handleWebSocketMessage = (data) => {
+    const notification = {
+      id: Date.now(),
+      type: data.type,
+      message: data.message,
+      timestamp: data.timestamp,
+    };
+    
+    setNotifications((prev) => [...prev, notification]);
+
+    if (data.type !== 'connection' && view === 'list') {
+      fetchArticles();
+    }
+    
+    if ((data.type === 'article_updated' || data.type === 'file_attached' || data.type === 'file_deleted') 
+        && selectedArticle && data.articleId === selectedArticle.id) {
+      handleArticleClick(data.articleId);
+    }
+  };
+
+  const removeNotification = (id) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const { isConnected } = useWebSocket(handleWebSocketMessage);
 
   const fetchArticles = async () => {
     setLoading(true);
@@ -67,14 +96,14 @@ function App() {
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.errors ? data.errors.join(', ') : data.error || 'Failed to create article');
       }
 
       await fetchArticles();
       setView('list');
-      return { success: true };
+      return { success: true, articleId: data.article.id };
     } catch (err) {
       setError(err.message);
       console.error('Error creating article:', err);
@@ -165,11 +194,17 @@ function App() {
       <header className="app-header">
         <div className="header-content">
           <h1>Article Management System</h1>
-          {view !== 'list' && (
-            <button className="btn btn-secondary" onClick={handleBackToList}>
-              ← Back to List
-            </button>
-          )}
+          <div className="header-actions">
+            <div className={`websocket-status ${isConnected ? 'connected' : 'disconnected'}`}>
+              <span className="status-indicator"></span>
+              {isConnected ? 'Live' : 'Offline'}
+            </div>
+            {view !== 'list' && (
+              <button className="btn btn-secondary" onClick={handleBackToList}>
+                ← Back to List
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -221,6 +256,17 @@ function App() {
       <footer className="app-footer">
         <p>Article count: {articles.length}</p>
       </footer>
+
+      <div className="notification-container">
+        {notifications.map((notification, index) => (
+          <div key={notification.id} style={{ marginTop: index > 0 ? '12px' : '0' }}>
+            <NotificationDisplay
+              notification={notification}
+              onClose={() => removeNotification(notification.id)}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
