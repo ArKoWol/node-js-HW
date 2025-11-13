@@ -1,9 +1,0 @@
-{
-  "id": "article-1730000000000-sample1",
-  "title": "Getting Started with Our Article System",
-  "content": "<h1>Welcome to the Article Management System</h1><p>This is a sample article to help you get started. You can create, view, and manage articles through this simple interface.</p><h2>Features</h2><ul><li>Create articles with a rich text editor</li><li>View all your articles in one place</li><li>Read full article content</li><li>Simple and clean interface</li></ul><p>Feel free to create your own articles using the <strong>Create Article</strong> button!</p>",
-  "author": "System",
-  "createdAt": "2025-10-26T10:00:00.000Z",
-  "updatedAt": "2025-10-26T10:00:00.000Z"
-}
-

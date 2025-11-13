@@ -57,3 +57,30 @@ export function generateFilename(title) {
   return `${timestamp}-${safeName}.json`;
 }
 
+export async function findFileByArticleId(articleId) {
+  try {
+    const files = await getAllArticleFiles();
+    
+    for (const file of files) {
+      try {
+        const article = await readArticleFile(file);
+        if (article.id === articleId) {
+          return file;
+        }
+      } catch (error) {
+        console.error(`Error reading article ${file}:`, error);
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error finding article file:', error);
+    return null;
+  }
+}
+
+export async function deleteArticleFile(filename) {
+  const filePath = path.join(DATA_DIR, filename);
+  await fs.unlink(filePath);
+}
+

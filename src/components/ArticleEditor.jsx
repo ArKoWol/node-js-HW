@@ -1,15 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import './ArticleEditor.css';
 
-function ArticleEditor({ onSubmit, onCancel, loading }) {
+function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit }) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [author, setAuthor] = useState('');
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (article && isEdit) {
+      setTitle(article.title || '');
+      setContent(article.content || '');
+      setAuthor(article.author || '');
+    }
+  }, [article, isEdit]);
 
   const modules = {
     toolbar: [
@@ -79,8 +87,8 @@ function ArticleEditor({ onSubmit, onCancel, loading }) {
   return (
     <div className="article-editor-container">
       <div className="editor-header">
-        <h2>Create New Article</h2>
-        <p>Fill in the details below to create a new article</p>
+        <h2>{isEdit ? 'Edit Article' : 'Create New Article'}</h2>
+        <p>{isEdit ? 'Update the article details below' : 'Fill in the details below to create a new article'}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="editor-form">
@@ -143,7 +151,7 @@ function ArticleEditor({ onSubmit, onCancel, loading }) {
             className="btn btn-primary"
             disabled={submitting || loading}
           >
-            {submitting || loading ? 'Creating...' : 'Create Article'}
+            {submitting || loading ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update Article' : 'Create Article')}
           </button>
         </div>
       </form>
@@ -155,6 +163,13 @@ ArticleEditor.propTypes = {
   onSubmit: PropTypes.func.isRequired,
   onCancel: PropTypes.func.isRequired,
   loading: PropTypes.bool.isRequired,
+  article: PropTypes.shape({
+    id: PropTypes.string,
+    title: PropTypes.string,
+    content: PropTypes.string,
+    author: PropTypes.string,
+  }),
+  isEdit: PropTypes.bool,
 };
 
 export default ArticleEditor;
