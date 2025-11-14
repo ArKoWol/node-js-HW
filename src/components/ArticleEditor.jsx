@@ -44,52 +44,6 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit }) {
     event.target.value = '';
   };
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      setUploadError('Invalid file type. Only images (JPG, PNG, GIF, WEBP) and PDFs are allowed.');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError('File size must be less than 10MB.');
-      return;
-    }
-
-    if (!article || !article.id) {
-      setUploadError('Please save the article before uploading attachments.');
-      return;
-    }
-
-    setUploadingFile(true);
-    setUploadError(null);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch(`http://localhost:3000/api/articles/${article.id}/attachments`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to upload file');
-      }
-
-      setAttachments([...attachments, data.attachment]);
-      event.target.value = '';
-    } catch (error) {
-      setUploadError(error.message);
-    } finally {
-      setUploadingFile(false);
-    }
-  };
 
   const removePendingFile = (index) => {
     setPendingFiles(pendingFiles.filter((_, i) => i !== index));
@@ -189,30 +143,43 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit }) {
     setSubmitting(false);
 
     if (result.success) {
-      setTitle('');
-      setContent('');
-      setAuthor('');
+      // For new articles, reset form and use returned articleId
+      if (!isEdit) {
+        setTitle('');
+        setContent('');
+        setAuthor('');
+      }
       setErrors({});
 
+      // Upload any pending files after successful save/update
       if (pendingFiles.length > 0) {
         await uploadPendingFiles(result.articleId);
       }
     }
   };
 
-  const uploadPendingFiles = async (articleId) => {
+  const uploadPendingFiles = async (articleId = null) => {
+    const targetArticleId = articleId || article?.id;
+    if (!targetArticleId) {
+      console.error('No article ID available for uploading files');
+      return;
+    }
+
     for (const file of pendingFiles) {
       try {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await fetch(`http://localhost:3000/api/articles/${articleId}/attachments`, {
+        const response = await fetch(`http://localhost:3000/api/articles/${targetArticleId}/attachments`, {
           method: 'POST',
           body: formData,
         });
 
         if (!response.ok) {
           console.error(`Failed to upload ${file.name}:`, await response.text());
+        } else {
+          const data = await response.json();
+          setAttachments(prev => [...prev, data.attachment]);
         }
       } catch (error) {
         console.error(`Error uploading ${file.name}:`, error);
@@ -288,11 +255,11 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit }) {
             <input
               type="file"
               id="file-upload"
-              onChange={isEdit ? handleFileUpload : handleFileSelect}
+              onChange={handleFileSelect}
               accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf"
               disabled={uploadingFile || submitting || loading}
               style={{ display: 'none' }}
-              multiple={!isEdit}
+              multiple
             />
             <label htmlFor="file-upload" className={`upload-button ${uploadingFile ? 'uploading' : ''}`}>
               {uploadingFile ? 'Uploading...' : 'Add File'}

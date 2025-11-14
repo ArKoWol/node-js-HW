@@ -28,7 +28,7 @@ function App() {
       timestamp: data.timestamp,
     };
     
-    setNotifications((prev) => [...prev, notification]);
+    setNotifications((prev) => [notification, ...prev].slice(0, 5));
 
     if (data.type !== 'connection' && view === 'list') {
       fetchArticles();
@@ -258,13 +258,12 @@ function App() {
       </footer>
 
       <div className="notification-container">
-        {notifications.map((notification, index) => (
-          <div key={notification.id} style={{ marginTop: index > 0 ? '12px' : '0' }}>
-            <NotificationDisplay
-              notification={notification}
-              onClose={() => removeNotification(notification.id)}
-            />
-          </div>
+        {notifications.map((notification) => (
+          <NotificationDisplay
+            key={notification.id}
+            notification={notification}
+            onClose={() => removeNotification(notification.id)}
+          />
         ))}
       </div>
     </div>
