@@ -157,9 +157,7 @@ router.post('/', async (req, res, next) => {
     
     const filename = generateFilename(article.title, article.id);
     await writeArticleFile(filename, article);
-    
-    console.log(`Article created: ${article.id} (${filename})`);
-    
+
     notifyArticleCreated(article);
     
     res.status(201).json({
@@ -213,9 +211,7 @@ router.put('/:id', async (req, res, next) => {
     
     // Write the updated article back to the same file
     await writeArticleFile(filename, updatedArticle);
-    
-    console.log(`Article updated: ${id} (${filename})`);
-    
+
     notifyArticleUpdated(updatedArticle);
     
     res.json({
@@ -251,9 +247,7 @@ router.delete('/:id', async (req, res, next) => {
     }
     
     await deleteArticleFile(filename);
-    
-    console.log(`Article deleted: ${id} (${filename})`);
-    
+
     notifyArticleDeleted(id, article.title);
     
     res.json({
@@ -298,9 +292,7 @@ router.post('/:id/attachments', upload.single('file'), async (req, res, next) =>
     article.updatedAt = new Date().toISOString();
     
     await writeArticleFile(filename, article);
-    
-    console.log(`File attached to article ${id}: ${attachment.filename}`);
-    
+
     notifyFileAttached(article, attachment);
     
     res.status(201).json({
@@ -353,9 +345,7 @@ router.delete('/:id/attachments/:attachmentId', async (req, res, next) => {
     article.updatedAt = new Date().toISOString();
     
     await writeArticleFile(filename, article);
-    
-    console.log(`Attachment deleted from article ${id}: ${attachment.filename}`);
-    
+
     notifyFileDeleted(id, article.title, attachment.filename);
     
     res.json({

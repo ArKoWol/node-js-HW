@@ -11,17 +11,13 @@ export const ATTACHMENTS_DIR = path.join(DATA_DIR, 'attachments');
 export async function initializeDataDirectory() {
   try {
     await fs.access(DATA_DIR);
-    console.log('Data directory exists:', DATA_DIR);
   } catch (error) {
-    console.log('Creating data directory:', DATA_DIR);
     await fs.mkdir(DATA_DIR, { recursive: true });
   }
-  
+
   try {
     await fs.access(ATTACHMENTS_DIR);
-    console.log('Attachments directory exists:', ATTACHMENTS_DIR);
   } catch (error) {
-    console.log('Creating attachments directory:', ATTACHMENTS_DIR);
     await fs.mkdir(ATTACHMENTS_DIR, { recursive: true });
   }
 }

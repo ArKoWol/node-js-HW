@@ -12,19 +12,16 @@ export function initializeWebSocket(server) {
   
   wss.on('connection', (ws, req) => {
     const clientIp = req.socket.remoteAddress;
-    console.log(`WebSocket client connected from ${clientIp}`);
-    
+
     ws.on('message', (message) => {
       try {
         const data = JSON.parse(message.toString());
-        console.log('Received message from client:', data);
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
       }
     });
-    
+
     ws.on('close', () => {
-      console.log(`WebSocket client disconnected from ${clientIp}`);
     });
     
     ws.on('error', (error) => {
@@ -37,8 +34,7 @@ export function initializeWebSocket(server) {
       timestamp: new Date().toISOString()
     }));
   });
-  
-  console.log('WebSocket server initialized on path /ws');
+
   return wss;
 }
 
@@ -60,8 +56,6 @@ export function broadcastNotification(notification) {
       clientCount++;
     }
   });
-  
-  console.log(`Broadcast notification to ${clientCount} client(s):`, notification.type);
 }
 
 export function notifyArticleCreated(article) {
