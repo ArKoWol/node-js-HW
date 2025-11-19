@@ -1,15 +1,49 @@
 import express from 'express';
+import multer from 'multer';
 import {
   getAllArticleFiles,
   readArticleFile,
   writeArticleFile,
   generateFilename,
-  articleFileExists,
   findFileByArticleId,
-  deleteArticleFile
+  deleteArticleFile,
+  saveAttachment,
+  deleteAttachment,
+  getAttachmentPath
 } from '../utils/fileSystem.js';
+import {
+  notifyArticleCreated,
+  notifyArticleUpdated,
+  notifyArticleDeleted,
+  notifyFileAttached,
+  notifyFileDeleted
+} from '../utils/notifications.js';
 
 const router = express.Router();
+
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, 
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimeTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'application/pdf'
+    ];
+    
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only images (JPG, PNG, GIF, WEBP) and PDFs are allowed.'));
+    }
+  }
+});
 
 function validateArticle(data) {
   const errors = [];
@@ -117,13 +151,14 @@ router.post('/', async (req, res, next) => {
       content: content.trim(),
       author: author?.trim() || 'Anonymous',
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      attachments: []
     };
     
-    const filename = generateFilename(article.title);
+    const filename = generateFilename(article.title, article.id);
     await writeArticleFile(filename, article);
-    
-    console.log(`Article created: ${article.id} (${filename})`);
+
+    notifyArticleCreated(article);
     
     res.status(201).json({
       success: true,
@@ -170,13 +205,14 @@ router.put('/:id', async (req, res, next) => {
       title: title.trim(),
       content: content.trim(),
       author: author?.trim() || existingArticle.author || 'Anonymous',
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      attachments: existingArticle.attachments || []
     };
     
     // Write the updated article back to the same file
     await writeArticleFile(filename, updatedArticle);
-    
-    console.log(`Article updated: ${id} (${filename})`);
+
+    notifyArticleUpdated(updatedArticle);
     
     res.json({
       success: true,
@@ -202,16 +238,157 @@ router.delete('/:id', async (req, res, next) => {
       });
     }
     
-    // Delete the article file
-    await deleteArticleFile(filename);
+    const article = await readArticleFile(filename);
     
-    console.log(`Article deleted: ${id} (${filename})`);
+    if (article.attachments && article.attachments.length > 0) {
+      for (const attachment of article.attachments) {
+        await deleteAttachment(attachment.storedFilename);
+      }
+    }
+    
+    await deleteArticleFile(filename);
+
+    notifyArticleDeleted(id, article.title);
     
     res.json({
       success: true,
       message: 'Article deleted successfully',
       deletedId: id
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/attachments', upload.single('file'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No file provided',
+        status: 400
+      });
+    }
+    
+    const filename = await findFileByArticleId(id);
+    if (!filename) {
+      return res.status(404).json({
+        success: false,
+        error: 'Article not found',
+        status: 404
+      });
+    }
+    
+    const article = await readArticleFile(filename);
+    
+    const attachment = await saveAttachment(req.file, id);
+    
+    if (!article.attachments) {
+      article.attachments = [];
+    }
+    article.attachments.push(attachment);
+    article.updatedAt = new Date().toISOString();
+    
+    await writeArticleFile(filename, article);
+
+    notifyFileAttached(article, attachment);
+    
+    res.status(201).json({
+      success: true,
+      message: 'File attached successfully',
+      attachment
+    });
+  } catch (error) {
+    if (error.message.includes('Invalid file type')) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+        status: 400
+      });
+    }
+    next(error);
+  }
+});
+
+router.delete('/:id/attachments/:attachmentId', async (req, res, next) => {
+  try {
+    const { id, attachmentId } = req.params;
+    
+    const filename = await findFileByArticleId(id);
+    if (!filename) {
+      return res.status(404).json({
+        success: false,
+        error: 'Article not found',
+        status: 404
+      });
+    }
+    
+    const article = await readArticleFile(filename);
+    
+    const attachmentIndex = article.attachments?.findIndex(a => a.id === attachmentId);
+    
+    if (attachmentIndex === -1 || attachmentIndex === undefined) {
+      return res.status(404).json({
+        success: false,
+        error: 'Attachment not found',
+        status: 404
+      });
+    }
+    
+    const attachment = article.attachments[attachmentIndex];
+    
+    await deleteAttachment(attachment.storedFilename);
+    
+    article.attachments.splice(attachmentIndex, 1);
+    article.updatedAt = new Date().toISOString();
+    
+    await writeArticleFile(filename, article);
+
+    notifyFileDeleted(id, article.title, attachment.filename);
+    
+    res.json({
+      success: true,
+      message: 'Attachment deleted successfully',
+      deletedId: attachmentId
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/:id/attachments/:attachmentId', async (req, res, next) => {
+  try {
+    const { id, attachmentId } = req.params;
+    
+    const filename = await findFileByArticleId(id);
+    if (!filename) {
+      return res.status(404).json({
+        success: false,
+        error: 'Article not found',
+        status: 404
+      });
+    }
+    
+    const article = await readArticleFile(filename);
+    
+    const attachment = article.attachments?.find(a => a.id === attachmentId);
+    
+    if (!attachment) {
+      return res.status(404).json({
+        success: false,
+        error: 'Attachment not found',
+        status: 404
+      });
+    }
+    
+    const filePath = await getAttachmentPath(attachment.storedFilename);
+    
+    res.setHeader('Content-Type', attachment.mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${attachment.filename}"`);
+    
+    res.sendFile(filePath);
   } catch (error) {
     next(error);
   }

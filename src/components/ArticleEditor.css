@@ -140,6 +140,138 @@
   margin-top: 1rem;
 }
 
+.upload-error {
+  background: #fed7d7;
+  color: #c53030;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  border-left: 4px solid #f56565;
+}
+
+.upload-error button {
+  background: none;
+  border: none;
+  color: #c53030;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 0.5rem;
+}
+
+.attachments-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: fit-content;
+}
+
+.upload-button:hover:not(.uploading) {
+  background: #5568d3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.upload-button.uploading {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.upload-hint {
+  font-size: 0.85rem;
+  color: #718096;
+}
+
+.attachments-list-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.attachments-list-editor h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #4a5568;
+  margin: 0 0 0.5rem 0;
+}
+
+.attachment-item-editor {
+  background: #f8f9fa;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.attachment-item-editor .attachment-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.attachment-item-editor .attachment-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.attachment-item-editor .attachment-name {
+  font-weight: 600;
+  color: #2d3748;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.25rem;
+}
+
+.attachment-item-editor .attachment-meta {
+  font-size: 0.85rem;
+  color: #718096;
+}
+
+.btn-delete-attachment {
+  background: #fed7d7;
+  color: #c53030;
+  border: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-delete-attachment:hover:not(:disabled) {
+  background: #fc8181;
+  transform: scale(1.1);
+}
+
+.btn-delete-attachment:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .editor-form {
@@ -161,6 +293,14 @@
 
   .ql-editor {
     min-height: 250px;
+  }
+  
+  .upload-button {
+    width: 100%;
+  }
+  
+  .attachment-item-editor {
+    flex-wrap: wrap;
   }
 }
 

@@ -4,5 +4,23 @@
   "content": "<p>This is a test article created via <strong>curl</strong>. It demonstrates that the API is working correctly.</p>",
   "author": "API Tester",
   "createdAt": "2025-10-26T19:33:03.695Z",
-  "updatedAt": "2025-10-26T19:33:03.695Z"
+  "updatedAt": "2025-11-14T15:50:16.458Z",
+  "attachments": [
+    {
+      "id": "attachment-1763046875580",
+      "filename": "Crystal_Ball.png",
+      "storedFilename": "article-1761507183695-gcjk2ku_1763046875580_Crystal_Ball.png",
+      "mimeType": "image/png",
+      "size": 8820,
+      "uploadedAt": "2025-11-13T15:14:35.581Z"
+    },
+    {
+      "id": "attachment-1763135416457",
+      "filename": "Game_Die.png",
+      "storedFilename": "article-1761507183695-gcjk2ku_1763135416457_Game_Die.png",
+      "mimeType": "image/png",
+      "size": 6111,
+      "uploadedAt": "2025-11-14T15:50:16.458Z"
+    }
+  ]
 }
