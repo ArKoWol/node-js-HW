@@ -1,16 +1,7 @@
 import express from 'express';
 import multer from 'multer';
-import {
-  getAllArticleFiles,
-  readArticleFile,
-  writeArticleFile,
-  generateFilename,
-  findFileByArticleId,
-  deleteArticleFile,
-  saveAttachment,
-  deleteAttachment,
-  getAttachmentPath
-} from '../utils/fileSystem.js';
+import Article from '../models/Article.js';
+import Attachment from '../models/Attachment.js';
 import {
   notifyArticleCreated,
   notifyArticleUpdated,
@@ -45,57 +36,24 @@ const upload = multer({
   }
 });
 
-function validateArticle(data) {
-  const errors = [];
-  
-  if (!data.title || typeof data.title !== 'string' || data.title.trim().length === 0) {
-    errors.push('Title is required and must be a non-empty string');
-  }
-  
-  if (data.title && data.title.trim().length > 200) {
-    errors.push('Title must be less than 200 characters');
-  }
-  
-  if (!data.content || typeof data.content !== 'string' || data.content.trim().length === 0) {
-    errors.push('Content is required and must be a non-empty string');
-  }
-  
-  if (data.content && data.content.length > 1000000) {
-    errors.push('Content is too large (max 1MB)');
-  }
-  
-  return errors;
-}
-
 router.get('/', async (req, res, next) => {
   try {
-    const files = await getAllArticleFiles();
+    const articles = await Article.findAll({
+      attributes: ['id', 'title', 'content', 'createdAt'],
+      order: [['createdAt', 'DESC']]
+    });
     
-    const articles = await Promise.all(
-      files.map(async (file) => {
-        try {
-          const article = await readArticleFile(file);
-          return {
-            id: article.id,
-            title: article.title,
-            createdAt: article.createdAt,
-            summary: article.content.substring(0, 150).replace(/<[^>]*>/g, '') + '...'
-          };
-        } catch (error) {
-          console.error(`Error reading article ${file}:`, error);
-          return null;
-        }
-      })
-    );
-    
-    const validArticles = articles
-      .filter(article => article !== null)
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const articlesWithSummary = articles.map(article => ({
+      id: article.id,
+      title: article.title,
+      createdAt: article.createdAt,
+      summary: article.content.substring(0, 150).replace(/<[^>]*>/g, '') + '...'
+    }));
     
     res.json({
       success: true,
-      count: validArticles.length,
-      articles: validArticles
+      count: articlesWithSummary.length,
+      articles: articlesWithSummary
     });
   } catch (error) {
     next(error);
@@ -105,26 +63,34 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const files = await getAllArticleFiles();
     
-    for (const file of files) {
-      try {
-        const article = await readArticleFile(file);
-        if (article.id === id) {
-          return res.json({
-            success: true,
-            article
-          });
-        }
-      } catch (error) {
-        console.error(`Error reading article ${file}:`, error);
-      }
+    const article = await Article.findByPk(id, {
+      include: [{
+        model: Attachment,
+        as: 'attachments',
+        attributes: ['id', 'filename', ['mime_type', 'mimeType'], 'size', ['created_at', 'createdAt']]
+      }]
+    });
+    
+    if (!article) {
+      return res.status(404).json({
+        success: false,
+        error: 'Article not found',
+        status: 404
+      });
     }
     
-    res.status(404).json({
-      success: false,
-      error: 'Article not found',
-      status: 404
+    res.json({
+      success: true,
+      article: {
+        id: article.id,
+        title: article.title,
+        content: article.content,
+        author: article.author,
+        createdAt: article.createdAt,
+        updatedAt: article.updatedAt,
+        attachments: article.attachments || []
+      }
     });
   } catch (error) {
     next(error);
@@ -135,37 +101,77 @@ router.post('/', async (req, res, next) => {
   try {
     const { title, content, author } = req.body;
     
-    const errors = validateArticle({ title, content });
-    if (errors.length > 0) {
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return res.status(400).json({
         success: false,
         error: 'Validation failed',
-        errors,
+        errors: ['Title is required and must be a non-empty string'],
         status: 400
       });
     }
     
-    const article = {
-      id: `article-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+    if (title.trim().length > 200) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: ['Title must be less than 200 characters'],
+        status: 400
+      });
+    }
+    
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: ['Content is required and must be a non-empty string'],
+        status: 400
+      });
+    }
+    
+    if (content.length > 1000000) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: ['Content is too large (max 1MB)'],
+        status: 400
+      });
+    }
+    
+    const article = await Article.create({
       title: title.trim(),
       content: content.trim(),
-      author: author?.trim() || 'Anonymous',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      attachments: []
-    };
-    
-    const filename = generateFilename(article.title, article.id);
-    await writeArticleFile(filename, article);
+      author: author?.trim() || 'Anonymous'
+    });
 
-    notifyArticleCreated(article);
+    notifyArticleCreated({
+      id: article.id,
+      title: article.title,
+      author: article.author,
+      createdAt: article.createdAt
+    });
     
     res.status(201).json({
       success: true,
       message: 'Article created successfully',
-      article
+      article: {
+        id: article.id,
+        title: article.title,
+        content: article.content,
+        author: article.author,
+        createdAt: article.createdAt,
+        updatedAt: article.updatedAt,
+        attachments: []
+      }
     });
   } catch (error) {
+    if (error.name === 'SequelizeValidationError') {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: error.errors.map(e => e.message),
+        status: 400
+      });
+    }
     next(error);
   }
 });
@@ -175,9 +181,9 @@ router.put('/:id', async (req, res, next) => {
     const { id } = req.params;
     const { title, content, author } = req.body;
     
-    // Find the existing article file
-    const filename = await findFileByArticleId(id);
-    if (!filename) {
+    const article = await Article.findByPk(id);
+    
+    if (!article) {
       return res.status(404).json({
         success: false,
         error: 'Article not found',
@@ -185,41 +191,76 @@ router.put('/:id', async (req, res, next) => {
       });
     }
     
-    // Validate the updated article data
-    const errors = validateArticle({ title, content });
-    if (errors.length > 0) {
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return res.status(400).json({
         success: false,
         error: 'Validation failed',
-        errors,
+        errors: ['Title is required and must be a non-empty string'],
         status: 400
       });
     }
     
-    // Read the existing article to preserve fields
-    const existingArticle = await readArticleFile(filename);
+    if (title.trim().length > 200) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: ['Title must be less than 200 characters'],
+        status: 400
+      });
+    }
     
-    // Update the article with new data
-    const updatedArticle = {
-      ...existingArticle,
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: ['Content is required and must be a non-empty string'],
+        status: 400
+      });
+    }
+    
+    if (content.length > 1000000) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: ['Content is too large (max 1MB)'],
+        status: 400
+      });
+    }
+    
+    await article.update({
       title: title.trim(),
       content: content.trim(),
-      author: author?.trim() || existingArticle.author || 'Anonymous',
-      updatedAt: new Date().toISOString(),
-      attachments: existingArticle.attachments || []
-    };
-    
-    // Write the updated article back to the same file
-    await writeArticleFile(filename, updatedArticle);
+      author: author?.trim() || article.author
+    });
 
-    notifyArticleUpdated(updatedArticle);
+    notifyArticleUpdated({
+      id: article.id,
+      title: article.title,
+      updatedAt: article.updatedAt
+    });
     
     res.json({
       success: true,
       message: 'Article updated successfully',
-      article: updatedArticle
+      article: {
+        id: article.id,
+        title: article.title,
+        content: article.content,
+        author: article.author,
+        createdAt: article.createdAt,
+        updatedAt: article.updatedAt,
+        attachments: []
+      }
     });
   } catch (error) {
+    if (error.name === 'SequelizeValidationError') {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: error.errors.map(e => e.message),
+        status: 400
+      });
+    }
     next(error);
   }
 });
@@ -228,9 +269,9 @@ router.delete('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
     
-    // Find the article file
-    const filename = await findFileByArticleId(id);
-    if (!filename) {
+    const article = await Article.findByPk(id);
+    
+    if (!article) {
       return res.status(404).json({
         success: false,
         error: 'Article not found',
@@ -238,17 +279,10 @@ router.delete('/:id', async (req, res, next) => {
       });
     }
     
-    const article = await readArticleFile(filename);
-    
-    if (article.attachments && article.attachments.length > 0) {
-      for (const attachment of article.attachments) {
-        await deleteAttachment(attachment.storedFilename);
-      }
-    }
-    
-    await deleteArticleFile(filename);
+    const articleTitle = article.title;
+    await article.destroy();
 
-    notifyArticleDeleted(id, article.title);
+    notifyArticleDeleted(id, articleTitle);
     
     res.json({
       success: true,
@@ -272,8 +306,9 @@ router.post('/:id/attachments', upload.single('file'), async (req, res, next) =>
       });
     }
     
-    const filename = await findFileByArticleId(id);
-    if (!filename) {
+    const article = await Article.findByPk(id);
+    
+    if (!article) {
       return res.status(404).json({
         success: false,
         error: 'Article not found',
@@ -281,24 +316,29 @@ router.post('/:id/attachments', upload.single('file'), async (req, res, next) =>
       });
     }
     
-    const article = await readArticleFile(filename);
-    
-    const attachment = await saveAttachment(req.file, id);
-    
-    if (!article.attachments) {
-      article.attachments = [];
-    }
-    article.attachments.push(attachment);
-    article.updatedAt = new Date().toISOString();
-    
-    await writeArticleFile(filename, article);
+    const attachment = await Attachment.create({
+      articleId: id,
+      filename: req.file.originalname,
+      mimeType: req.file.mimetype,
+      size: req.file.size,
+      data: req.file.buffer
+    });
 
-    notifyFileAttached(article, attachment);
+    notifyFileAttached(
+      { id: article.id, title: article.title },
+      { id: attachment.id, filename: attachment.filename }
+    );
     
     res.status(201).json({
       success: true,
       message: 'File attached successfully',
-      attachment
+      attachment: {
+        id: attachment.id,
+        filename: attachment.filename,
+        mimeType: attachment.mimeType,
+        size: attachment.size,
+        createdAt: attachment.createdAt
+      }
     });
   } catch (error) {
     if (error.message.includes('Invalid file type')) {
@@ -316,20 +356,11 @@ router.delete('/:id/attachments/:attachmentId', async (req, res, next) => {
   try {
     const { id, attachmentId } = req.params;
     
-    const filename = await findFileByArticleId(id);
-    if (!filename) {
-      return res.status(404).json({
-        success: false,
-        error: 'Article not found',
-        status: 404
-      });
-    }
+    const attachment = await Attachment.findOne({
+      where: { id: attachmentId, articleId: id }
+    });
     
-    const article = await readArticleFile(filename);
-    
-    const attachmentIndex = article.attachments?.findIndex(a => a.id === attachmentId);
-    
-    if (attachmentIndex === -1 || attachmentIndex === undefined) {
+    if (!attachment) {
       return res.status(404).json({
         success: false,
         error: 'Attachment not found',
@@ -337,16 +368,12 @@ router.delete('/:id/attachments/:attachmentId', async (req, res, next) => {
       });
     }
     
-    const attachment = article.attachments[attachmentIndex];
+    const article = await Article.findByPk(id);
+    const filename = attachment.filename;
     
-    await deleteAttachment(attachment.storedFilename);
-    
-    article.attachments.splice(attachmentIndex, 1);
-    article.updatedAt = new Date().toISOString();
-    
-    await writeArticleFile(filename, article);
+    await attachment.destroy();
 
-    notifyFileDeleted(id, article.title, attachment.filename);
+    notifyFileDeleted(id, article?.title || 'Article', filename);
     
     res.json({
       success: true,
@@ -362,18 +389,9 @@ router.get('/:id/attachments/:attachmentId', async (req, res, next) => {
   try {
     const { id, attachmentId } = req.params;
     
-    const filename = await findFileByArticleId(id);
-    if (!filename) {
-      return res.status(404).json({
-        success: false,
-        error: 'Article not found',
-        status: 404
-      });
-    }
-    
-    const article = await readArticleFile(filename);
-    
-    const attachment = article.attachments?.find(a => a.id === attachmentId);
+    const attachment = await Attachment.findOne({
+      where: { id: attachmentId, articleId: id }
+    });
     
     if (!attachment) {
       return res.status(404).json({
@@ -383,16 +401,14 @@ router.get('/:id/attachments/:attachmentId', async (req, res, next) => {
       });
     }
     
-    const filePath = await getAttachmentPath(attachment.storedFilename);
-    
     res.setHeader('Content-Type', attachment.mimeType);
     res.setHeader('Content-Disposition', `inline; filename="${attachment.filename}"`);
+    res.setHeader('Content-Length', attachment.size);
     
-    res.sendFile(filePath);
+    res.send(attachment.data);
   } catch (error) {
     next(error);
   }
 });
 
 export default router;
-

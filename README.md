@@ -5,14 +5,18 @@ Full-stack application for managing articles with React frontend and Node.js bac
 ## Tech Stack
 
 **Frontend**: React 19, Vite, React Quill New (WYSIWYG editor), WebSocket  
-**Backend**: Node.js, Express, WebSocket (ws), Multer, File-based storage (JSON)
+**Backend**: Node.js, Express, PostgreSQL, Sequelize ORM, WebSocket (ws), Multer  
+**Database**: PostgreSQL with Sequelize migrations
 
 ## Prerequisites
 
 - Node.js v18 or higher
 - npm
+- PostgreSQL 12 or higher (installed and running)
 
 ## Installation
+
+### 1. Install Dependencies
 
 ```bash
 npm install 
@@ -22,6 +26,37 @@ cd backend
 npm install
 cd ..
 ```
+
+### 2. Database Setup
+
+**Important:** You need to set up PostgreSQL before running the application.
+
+**Quick Setup:**
+
+1. Install PostgreSQL (if not already installed)
+2. Create database:
+   ```bash
+   psql postgres
+   CREATE DATABASE articles_db;
+   \q
+   ```
+
+3. Create `.env` file in the project root:
+   ```env
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_NAME=articles_db
+   DB_USER=postgres
+   DB_PASSWORD=your_password
+   PORT=3000
+   ```
+
+4. Run migrations:
+   ```bash
+   cd backend
+   npm run db:migrate
+   cd ..
+   ```
 
 ## Running the Application
 
@@ -98,14 +133,22 @@ curl -X POST http://localhost:3000/api/articles \
 ```
 ├── backend/
 │   ├── server.js              # Express + WebSocket server
+│   ├── config/
+│   │   ├── database.js        # Sequelize configuration (ES modules)
+│   │   └── database.cjs       # Sequelize CLI configuration
+│   ├── models/
+│   │   ├── index.js           # Sequelize connection
+│   │   └── Article.js         # Article model
+│   ├── migrations/
+│   │   └── *-create-articles-table.cjs  # Database migrations
 │   ├── routes/
-│   │   └── articles.js        # API routes + file upload
+│   │   └── articles.js        # API routes + database queries
 │   ├── utils/
-│   │   ├── fileSystem.js      # File operations
-│   │   └── websocket.js       # WebSocket notifications
+│   │   ├── fileSystem.js      # File operations for attachments
+│   │   ├── websocket.js       # WebSocket notifications
+│   │   └── notifications.js   # Notification utilities
 │   └── data/
-│       ├── *.json             # Article storage
-│       └── attachments/       # File attachments
+│       └── attachments/       # File attachments storage
 ├── src/
 │   ├── App.jsx                # Main app + WebSocket integration
 │   ├── components/
@@ -123,7 +166,8 @@ curl -X POST http://localhost:3000/api/articles \
 
 ### Backend
 - RESTful API with Express
-- File-based storage (JSON)
+- **PostgreSQL database with Sequelize ORM**
+- Database migrations for easy setup
 - Input validation (title, content, files)
 - Error handling
 - CORS enabled
@@ -241,18 +285,22 @@ npm run lint     # Run linter
 
 **Backend scripts:**
 ```bash
-npm start        # Start server
-npm run dev      # Start with auto-restart
+npm start                 # Start server
+npm run dev              # Start with auto-restart
+npm run db:migrate       # Run database migrations
+npm run db:migrate:undo  # Undo last migration
+npm run db:migrate:status # Check migration status
 ```
 
 ## Notes
 
-- Articles are stored as individual JSON files in `backend/data/`
-- Filename format: `{timestamp}-{title-slug}.json`
-- Sample data included for testing
-- File attachments are stored in `backend/data/attachments/`
+- **Articles are stored in PostgreSQL database** using Sequelize ORM
+- File attachments are stored in `backend/data/attachments/` directory
+- Attachment metadata is stored in database as JSONB
 - Attachment filename format: `{articleId}_{timestamp}_{originalName}`
 - WebSocket runs on the same port as HTTP server at path `/ws`
+- Database uses UUID for article IDs with automatic timestamps
+- Migrations ensure database schema consistency across environments
 
 ## New Features Guide
 
