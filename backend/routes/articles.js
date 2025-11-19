@@ -17,7 +17,7 @@ import {
   notifyArticleDeleted,
   notifyFileAttached,
   notifyFileDeleted
-} from '../utils/websocket.js';
+} from '../utils/notifications.js';
 
 const router = express.Router();
 
