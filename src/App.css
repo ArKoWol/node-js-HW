@@ -101,6 +101,15 @@ body {
   border-color: #cbd5e0;
 }
 
+.btn-danger {
+  background: #f56565;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #e53e3e;
+}
+
 .error-banner {
   background: #fed7d7;
   color: #c53030;

@@ -40,6 +40,11 @@ const Article = sequelize.define('Article', {
     allowNull: false,
     defaultValue: 'Anonymous'
   },
+  workspaceId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+    field: 'workspace_id'
+  }
 }, {
   tableName: 'articles',
   timestamps: true,
@@ -50,6 +55,9 @@ const Article = sequelize.define('Article', {
     },
     {
       fields: ['title']
+    },
+    {
+      fields: ['workspace_id']
     }
   ]
 });

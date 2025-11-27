@@ -1,7 +1,8 @@
 import PropTypes from 'prop-types';
 import './ArticleView.css';
+import CommentSection from './CommentSection';
 
-function ArticleView({ article, loading, onEdit, onDelete }) {
+function ArticleView({ article, loading, onEdit, onDelete, onAddComment, onUpdateComment, onDeleteComment }) {
   if (loading) {
     return (
       <div className="loading-container">
@@ -45,6 +46,9 @@ function ArticleView({ article, loading, onEdit, onDelete }) {
       <article className="article-content">
         <header className="article-header">
           <h1>{article.title}</h1>
+          {article.workspace && (
+            <span className="workspace-badge">{article.workspace.name}</span>
+          )}
           <div className="article-metadata">
             <span className="author">By {article.author}</span>
             <span className="separator">•</span>
@@ -119,6 +123,13 @@ function ArticleView({ article, loading, onEdit, onDelete }) {
             Delete Article
           </button>
         </div>
+        <CommentSection
+          comments={article.comments || []}
+          onAddComment={onAddComment}
+          onUpdateComment={onUpdateComment}
+          onDeleteComment={onDeleteComment}
+          disabled={loading}
+        />
       </article>
     </div>
   );
@@ -132,10 +143,25 @@ ArticleView.propTypes = {
     author: PropTypes.string.isRequired,
     createdAt: PropTypes.string.isRequired,
     updatedAt: PropTypes.string,
+    workspace: PropTypes.shape({
+      id: PropTypes.string,
+      name: PropTypes.string,
+    }),
+    comments: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.string.isRequired,
+        author: PropTypes.string.isRequired,
+        content: PropTypes.string.isRequired,
+        createdAt: PropTypes.string.isRequired,
+      })
+    ),
   }),
   loading: PropTypes.bool.isRequired,
   onEdit: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
+  onAddComment: PropTypes.func.isRequired,
+  onUpdateComment: PropTypes.func.isRequired,
+  onDeleteComment: PropTypes.func.isRequired,
 };
 
 export default ArticleView;

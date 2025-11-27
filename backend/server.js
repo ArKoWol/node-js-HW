@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import http from 'http';
 import articlesRouter from './routes/articles.js';
+import workspacesRouter from './routes/workspaces.js';
 import { testConnection } from './models/index.js';
 import { initializeWebSocket } from './utils/websocket.js';
 
@@ -31,6 +32,7 @@ try {
 }
 
 app.use('/api/articles', articlesRouter);
+app.use('/api/workspaces', workspacesRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });

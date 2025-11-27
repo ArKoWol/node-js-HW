@@ -2,6 +2,8 @@ import express from 'express';
 import multer from 'multer';
 import Article from '../models/Article.js';
 import Attachment from '../models/Attachment.js';
+import Workspace from '../models/Workspace.js';
+import Comment from '../models/Comment.js';
 import {
   notifyArticleCreated,
   notifyArticleUpdated,
@@ -36,18 +38,55 @@ const upload = multer({
   }
 });
 
+const formatWorkspace = (workspace) => workspace ? {
+  id: workspace.id,
+  name: workspace.name,
+  slug: workspace.slug,
+  description: workspace.description
+} : null;
+
+const formatComment = (comment) => ({
+  id: comment.id,
+  author: comment.author,
+  content: comment.content,
+  createdAt: comment.createdAt,
+  updatedAt: comment.updatedAt
+});
+
 router.get('/', async (req, res, next) => {
   try {
+    const { workspaceId } = req.query;
+    let workspaceFilter = {};
+
+    if (workspaceId) {
+      const workspaceExists = await Workspace.findByPk(workspaceId);
+      if (!workspaceExists) {
+        return res.status(404).json({
+          success: false,
+          error: 'Workspace not found',
+          status: 404
+        });
+      }
+      workspaceFilter.workspaceId = workspaceId;
+    }
+
     const articles = await Article.findAll({
+      where: workspaceFilter,
       attributes: ['id', 'title', 'content', 'createdAt'],
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
+      include: [{
+        model: Workspace,
+        as: 'workspace',
+        attributes: ['id', 'name', 'slug']
+      }]
     });
     
     const articlesWithSummary = articles.map(article => ({
       id: article.id,
       title: article.title,
       createdAt: article.createdAt,
-      summary: article.content.substring(0, 150).replace(/<[^>]*>/g, '') + '...'
+      summary: article.content.substring(0, 150).replace(/<[^>]*>/g, '') + '...',
+      workspace: formatWorkspace(article.workspace)
     }));
     
     res.json({
@@ -65,11 +104,25 @@ router.get('/:id', async (req, res, next) => {
     const { id } = req.params;
     
     const article = await Article.findByPk(id, {
-      include: [{
-        model: Attachment,
-        as: 'attachments',
-        attributes: ['id', 'filename', ['mime_type', 'mimeType'], 'size', ['created_at', 'createdAt']]
-      }]
+      include: [
+        {
+          model: Attachment,
+          as: 'attachments',
+          attributes: ['id', 'filename', ['mime_type', 'mimeType'], 'size', ['created_at', 'createdAt']]
+        },
+        {
+          model: Workspace,
+          as: 'workspace',
+          attributes: ['id', 'name', 'slug', 'description']
+        },
+        {
+          model: Comment,
+          as: 'comments',
+          attributes: ['id', 'author', 'content', 'createdAt', 'updatedAt'],
+          separate: true,
+          order: [['createdAt', 'DESC']]
+        }
+      ]
     });
     
     if (!article) {
@@ -89,7 +142,9 @@ router.get('/:id', async (req, res, next) => {
         author: article.author,
         createdAt: article.createdAt,
         updatedAt: article.updatedAt,
-        attachments: article.attachments || []
+        attachments: article.attachments || [],
+        workspace: formatWorkspace(article.workspace),
+        comments: (article.comments || []).map(formatComment)
       }
     });
   } catch (error) {
@@ -99,7 +154,7 @@ router.get('/:id', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { title, content, author } = req.body;
+    const { title, content, author, workspaceId } = req.body;
     
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return res.status(400).json({
@@ -137,10 +192,30 @@ router.post('/', async (req, res, next) => {
       });
     }
     
+    if (!workspaceId || typeof workspaceId !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: ['WorkspaceId is required'],
+        status: 400
+      });
+    }
+
+    const workspace = await Workspace.findByPk(workspaceId);
+
+    if (!workspace) {
+      return res.status(404).json({
+        success: false,
+        error: 'Workspace not found',
+        status: 404
+      });
+    }
+
     const article = await Article.create({
       title: title.trim(),
       content: content.trim(),
-      author: author?.trim() || 'Anonymous'
+      author: author?.trim() || 'Anonymous',
+      workspaceId: workspace.id
     });
 
     notifyArticleCreated({
@@ -160,7 +235,9 @@ router.post('/', async (req, res, next) => {
         author: article.author,
         createdAt: article.createdAt,
         updatedAt: article.updatedAt,
-        attachments: []
+        attachments: [],
+        workspace: formatWorkspace(workspace),
+        comments: []
       }
     });
   } catch (error) {
@@ -179,7 +256,7 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { title, content, author } = req.body;
+    const { title, content, author, workspaceId } = req.body;
     
     const article = await Article.findByPk(id);
     
@@ -227,11 +304,29 @@ router.put('/:id', async (req, res, next) => {
       });
     }
     
-    await article.update({
+    let updatedWorkspace = null;
+    if (workspaceId) {
+      updatedWorkspace = await Workspace.findByPk(workspaceId);
+      if (!updatedWorkspace) {
+        return res.status(404).json({
+          success: false,
+          error: 'Workspace not found',
+          status: 404
+        });
+      }
+    }
+
+    const payload = {
       title: title.trim(),
       content: content.trim(),
       author: author?.trim() || article.author
-    });
+    };
+
+    if (updatedWorkspace) {
+      payload.workspaceId = updatedWorkspace.id;
+    }
+
+    await article.update(payload);
 
     notifyArticleUpdated({
       id: article.id,
@@ -239,17 +334,33 @@ router.put('/:id', async (req, res, next) => {
       updatedAt: article.updatedAt
     });
     
+    const updatedArticle = await Article.findByPk(article.id, {
+      include: [
+        { model: Workspace, as: 'workspace', attributes: ['id', 'name', 'slug', 'description'] },
+        { model: Attachment, as: 'attachments', attributes: ['id', 'filename', ['mime_type', 'mimeType'], 'size', ['created_at', 'createdAt']] },
+        {
+          model: Comment,
+          as: 'comments',
+          attributes: ['id', 'author', 'content', 'createdAt', 'updatedAt'],
+          separate: true,
+          order: [['createdAt', 'DESC']]
+        }
+      ]
+    });
+
     res.json({
       success: true,
       message: 'Article updated successfully',
       article: {
-        id: article.id,
-        title: article.title,
-        content: article.content,
-        author: article.author,
-        createdAt: article.createdAt,
-        updatedAt: article.updatedAt,
-        attachments: []
+        id: updatedArticle.id,
+        title: updatedArticle.title,
+        content: updatedArticle.content,
+        author: updatedArticle.author,
+        createdAt: updatedArticle.createdAt,
+        updatedAt: updatedArticle.updatedAt,
+        attachments: updatedArticle.attachments || [],
+        workspace: formatWorkspace(updatedArticle.workspace),
+        comments: (updatedArticle.comments || []).map(formatComment)
       }
     });
   } catch (error) {
@@ -406,6 +517,170 @@ router.get('/:id/attachments/:attachmentId', async (req, res, next) => {
     res.setHeader('Content-Length', attachment.size);
     
     res.send(attachment.data);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/:id/comments', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const article = await Article.findByPk(id);
+
+    if (!article) {
+      return res.status(404).json({
+        success: false,
+        error: 'Article not found',
+        status: 404
+      });
+    }
+
+    const comments = await Comment.findAll({
+      where: { articleId: id },
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.json({
+      success: true,
+      count: comments.length,
+      comments: comments.map(formatComment)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/comments', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { author, content } = req.body;
+
+    const article = await Article.findByPk(id);
+
+    if (!article) {
+      return res.status(404).json({
+        success: false,
+        error: 'Article not found',
+        status: 404
+      });
+    }
+
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: ['Content is required and must be a non-empty string'],
+        status: 400
+      });
+    }
+
+    if (content.length > 5000) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: ['Content is too large (max 5,000 characters)'],
+        status: 400
+      });
+    }
+
+    const comment = await Comment.create({
+      articleId: article.id,
+      workspaceId: article.workspaceId,
+      author: author?.trim() || 'Anonymous',
+      content: content.trim()
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Comment created successfully',
+      comment: formatComment(comment)
+    });
+  } catch (error) {
+    if (error.name === 'SequelizeValidationError') {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: error.errors.map(e => e.message),
+        status: 400
+      });
+    }
+    next(error);
+  }
+});
+
+router.put('/:id/comments/:commentId', async (req, res, next) => {
+  try {
+    const { id, commentId } = req.params;
+    const { author, content } = req.body;
+
+    const comment = await Comment.findOne({
+      where: { id: commentId, articleId: id }
+    });
+
+    if (!comment) {
+      return res.status(404).json({
+        success: false,
+        error: 'Comment not found',
+        status: 404
+      });
+    }
+
+    if (content && (typeof content !== 'string' || content.trim().length === 0)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: ['Content must be a non-empty string if provided'],
+        status: 400
+      });
+    }
+
+    if (content && content.length > 5000) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: ['Content is too large (max 5,000 characters)'],
+        status: 400
+      });
+    }
+
+    await comment.update({
+      author: author?.trim() || comment.author,
+      content: content?.trim() || comment.content
+    });
+
+    res.json({
+      success: true,
+      message: 'Comment updated successfully',
+      comment: formatComment(comment)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/:id/comments/:commentId', async (req, res, next) => {
+  try {
+    const { id, commentId } = req.params;
+
+    const comment = await Comment.findOne({
+      where: { id: commentId, articleId: id }
+    });
+
+    if (!comment) {
+      return res.status(404).json({
+        success: false,
+        error: 'Comment not found',
+        status: 404
+      });
+    }
+
+    await comment.destroy();
+
+    res.json({
+      success: true,
+      message: 'Comment deleted successfully',
+      deletedId: commentId
+    });
   } catch (error) {
     next(error);
   }

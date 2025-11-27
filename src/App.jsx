@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import ArticleList from './components/ArticleList';
 import ArticleView from './components/ArticleView';
 import ArticleEditor from './components/ArticleEditor';
 import NotificationDisplay from './components/NotificationDisplay';
 import { useWebSocket } from './hooks/useWebSocket';
+import WorkspaceSwitcher from './components/WorkspaceSwitcher';
 
 const API_URL = 'http://localhost:3000/api';
 
@@ -15,10 +16,63 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notifications, setNotifications] = useState([]);
+  const [workspaces, setWorkspaces] = useState([]);
+  const [workspacesLoading, setWorkspacesLoading] = useState(false);
+  const [workspacesError, setWorkspacesError] = useState(null);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
+
+  const fetchWorkspaces = useCallback(async () => {
+    setWorkspacesLoading(true);
+    setWorkspacesError(null);
+    try {
+      const response = await fetch(`${API_URL}/workspaces`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch workspaces');
+      }
+      const data = await response.json();
+      setWorkspaces(data.workspaces || []);
+      if (data.workspaces?.length) {
+        setActiveWorkspaceId((prev) => prev || data.workspaces[0].id);
+      }
+    } catch (err) {
+      console.error('Error fetching workspaces:', err);
+      setWorkspacesError(err.message);
+    } finally {
+      setWorkspacesLoading(false);
+    }
+  }, []);
+
+  const fetchArticles = useCallback(async (workspaceId) => {
+    if (!workspaceId) {
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/articles?workspaceId=${workspaceId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch articles');
+      }
+      const data = await response.json();
+      setArticles(data.articles || []);
+    } catch (err) {
+      setError(err.message);
+      console.error('Error fetching articles:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchArticles();
-  }, []);
+    fetchWorkspaces();
+  }, [fetchWorkspaces]);
+
+  useEffect(() => {
+    if (activeWorkspaceId) {
+      setArticles([]);
+      fetchArticles(activeWorkspaceId);
+    }
+  }, [activeWorkspaceId, fetchArticles]);
 
   const handleWebSocketMessage = (data) => {
     const notification = {
@@ -31,7 +85,8 @@ function App() {
     setNotifications((prev) => [notification, ...prev].slice(0, 5));
 
     if (data.type !== 'connection' && view === 'list') {
-      fetchArticles();
+      fetchArticles(activeWorkspaceId);
+      fetchWorkspaces();
     }
     
     if ((data.type === 'article_updated' || data.type === 'file_attached' || data.type === 'file_deleted') 
@@ -45,24 +100,6 @@ function App() {
   };
 
   const { isConnected } = useWebSocket(handleWebSocketMessage);
-
-  const fetchArticles = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`${API_URL}/articles`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch articles');
-      }
-      const data = await response.json();
-      setArticles(data.articles || []);
-    } catch (err) {
-      setError(err.message);
-      console.error('Error fetching articles:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleArticleClick = async (articleId) => {
     setLoading(true);
@@ -87,12 +124,13 @@ function App() {
     setLoading(true);
     setError(null);
     try {
+      const workspaceId = articleData.workspaceId || activeWorkspaceId;
       const response = await fetch(`${API_URL}/articles`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(articleData),
+        body: JSON.stringify({ ...articleData, workspaceId }),
       });
 
       const data = await response.json();
@@ -101,7 +139,8 @@ function App() {
         throw new Error(data.errors ? data.errors.join(', ') : data.error || 'Failed to create article');
       }
 
-      await fetchArticles();
+      await fetchArticles(workspaceId);
+      await fetchWorkspaces();
       setView('list');
       return { success: true, articleId: data.article.id };
     } catch (err) {
@@ -117,12 +156,13 @@ function App() {
     setLoading(true);
     setError(null);
     try {
+      const workspaceId = articleData.workspaceId || activeWorkspaceId;
       const response = await fetch(`${API_URL}/articles/${articleId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(articleData),
+        body: JSON.stringify({ ...articleData, workspaceId }),
       });
 
       const data = await response.json();
@@ -131,7 +171,8 @@ function App() {
         throw new Error(data.errors ? data.errors.join(', ') : data.error || 'Failed to update article');
       }
 
-      await fetchArticles();
+      await fetchArticles(workspaceId);
+      await fetchWorkspaces();
       setSelectedArticle(data.article);
       setView('view');
       return { success: true };
@@ -162,7 +203,8 @@ function App() {
         throw new Error(data.error || 'Failed to delete article');
       }
 
-      await fetchArticles();
+      await fetchArticles(activeWorkspaceId);
+      await fetchWorkspaces();
       setView('list');
       setSelectedArticle(null);
     } catch (err) {
@@ -189,6 +231,87 @@ function App() {
     setError(null);
   };
 
+  const handleAddComment = async (articleId, commentData) => {
+    try {
+      const response = await fetch(`${API_URL}/articles/${articleId}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(commentData)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.errors ? data.errors.join(', ') : data.error || 'Failed to add comment');
+      }
+      setSelectedArticle((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          comments: [data.comment, ...(prev.comments || [])]
+        };
+      });
+      return { success: true, comment: data.comment };
+    } catch (err) {
+      console.error('Error creating comment:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const handleUpdateComment = async (articleId, commentId, commentData) => {
+    try {
+      const response = await fetch(`${API_URL}/articles/${articleId}/comments/${commentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(commentData)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.errors ? data.errors.join(', ') : data.error || 'Failed to update comment');
+      }
+      setSelectedArticle((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          comments: (prev.comments || []).map((comment) =>
+            comment.id === commentId ? data.comment : comment
+          )
+        };
+      });
+      return { success: true };
+    } catch (err) {
+      console.error('Error updating comment:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const handleDeleteComment = async (articleId, commentId) => {
+    try {
+      const response = await fetch(`${API_URL}/articles/${articleId}/comments/${commentId}`, {
+        method: 'DELETE'
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete comment');
+      }
+      setSelectedArticle((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          comments: (prev.comments || []).filter((comment) => comment.id !== commentId)
+        };
+      });
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting comment:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) || null;
+
   return (
     <div className="app">
       <header className="app-header">
@@ -206,6 +329,18 @@ function App() {
             )}
           </div>
         </div>
+        <WorkspaceSwitcher
+          workspaces={workspaces}
+          loading={workspacesLoading}
+          error={workspacesError}
+          activeWorkspaceId={activeWorkspaceId}
+          onSelect={(workspaceId) => {
+            setActiveWorkspaceId(workspaceId);
+            setSelectedArticle(null);
+            setView('list');
+          }}
+          onRefresh={fetchWorkspaces}
+        />
       </header>
 
       <main className="app-main">
@@ -220,6 +355,8 @@ function App() {
           <ArticleList
             articles={articles}
             loading={loading}
+            workspacesLoading={workspacesLoading}
+            activeWorkspace={activeWorkspace}
             onArticleClick={handleArticleClick}
             onCreateNew={handleCreateNew}
           />
@@ -231,6 +368,11 @@ function App() {
             loading={loading}
             onEdit={handleEditMode}
             onDelete={handleDeleteArticle}
+            onAddComment={(commentData) => handleAddComment(selectedArticle.id, commentData)}
+            onUpdateComment={(commentId, commentData) =>
+              handleUpdateComment(selectedArticle.id, commentId, commentData)
+            }
+            onDeleteComment={(commentId) => handleDeleteComment(selectedArticle.id, commentId)}
           />
         )}
 
@@ -239,6 +381,8 @@ function App() {
             onSubmit={handleCreateArticle}
             onCancel={handleBackToList}
             loading={loading}
+            workspaces={workspaces}
+            defaultWorkspaceId={activeWorkspaceId}
           />
         )}
 
@@ -249,6 +393,8 @@ function App() {
             onCancel={() => setView('view')}
             loading={loading}
             isEdit
+            workspaces={workspaces}
+            defaultWorkspaceId={activeWorkspaceId}
           />
         )}
       </main>
