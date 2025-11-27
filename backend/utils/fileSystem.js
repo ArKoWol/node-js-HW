@@ -123,11 +123,12 @@ export async function deleteAttachment(storedFilename) {
   const filePath = path.join(ATTACHMENTS_DIR, storedFilename);
   try {
     await fs.unlink(filePath);
-    return true;
   } catch (error) {
-    console.error('Error deleting attachment:', error);
-    return false;
+    if (error.code !== 'ENOENT') {
+      console.error('Error deleting attachment:', error);
+    }
   }
+  return true;
 }
 
 export async function getAttachmentPath(storedFilename) {

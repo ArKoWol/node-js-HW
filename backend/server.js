@@ -5,7 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import http from 'http';
 import articlesRouter from './routes/articles.js';
-import { initializeDataDirectory } from './utils/fileSystem.js';
+import { testConnection } from './models/index.js';
 import { initializeWebSocket } from './utils/websocket.js';
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -19,7 +19,16 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-await initializeDataDirectory();
+try {
+  await testConnection();
+} catch (error) {
+  console.error('Failed to connect to database. Please ensure:');
+  console.error('1. PostgreSQL is running');
+  console.error('2. Database credentials are correct in .env file');
+  console.error('3. Database has been created and migrations have been run');
+  console.error('\nRun: npm run db:migrate');
+  process.exit(1);
+}
 
 app.use('/api/articles', articlesRouter);
 
