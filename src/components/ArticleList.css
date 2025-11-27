@@ -22,6 +22,19 @@
   gap: 1rem;
 }
 
+.list-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.list-header-subtitle {
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a0aec0;
+}
+
 .list-header h2 {
   font-size: 1.8rem;
   color: #2d3748;
@@ -101,17 +114,30 @@
   overflow: hidden;
 }
 
-.article-meta {
+.article-card-top {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding-top: 1rem;
-  border-top: 1px solid #e2e8f0;
+  align-items: center;
+  margin-bottom: 0.75rem;
 }
 
 .article-date {
   font-size: 0.85rem;
   color: #a0aec0;
+}
+
+.workspace-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #edf2ff;
+  color: #4c51bf;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-weight: 600;
 }
 
 /* Responsive */

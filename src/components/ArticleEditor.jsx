@@ -4,10 +4,11 @@ import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import './ArticleEditor.css';
 
-function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit }) {
+function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit, workspaces, defaultWorkspaceId }) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [author, setAuthor] = useState('');
+  const [workspaceId, setWorkspaceId] = useState(defaultWorkspaceId || '');
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [attachments, setAttachments] = useState([]);
@@ -21,8 +22,15 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit }) {
       setContent(article.content || '');
       setAuthor(article.author || '');
       setAttachments(article.attachments || []);
+      setWorkspaceId(article.workspace?.id || article.workspaceId || defaultWorkspaceId || '');
     }
-  }, [article, isEdit]);
+  }, [article, isEdit, defaultWorkspaceId]);
+
+  useEffect(() => {
+    if (!isEdit && defaultWorkspaceId) {
+      setWorkspaceId(defaultWorkspaceId);
+    }
+  }, [defaultWorkspaceId, isEdit]);
 
   const handleFileSelect = (event) => {
     const files = Array.from(event.target.files);
@@ -122,6 +130,10 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit }) {
       newErrors.content = 'Content is required';
     }
 
+    if (!workspaceId) {
+      newErrors.workspaceId = 'Workspace is required';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -138,6 +150,7 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit }) {
       title: title.trim(),
       content: content.trim(),
       author: author.trim() || 'Anonymous',
+      workspaceId,
     });
 
     setSubmitting(false);
@@ -165,27 +178,32 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit }) {
       return;
     }
 
-    for (const file of pendingFiles) {
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
+    setUploadingFile(true);
+    try {
+      for (const file of pendingFiles) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
 
-        const response = await fetch(`http://localhost:3000/api/articles/${targetArticleId}/attachments`, {
-          method: 'POST',
-          body: formData,
-        });
+          const response = await fetch(`http://localhost:3000/api/articles/${targetArticleId}/attachments`, {
+            method: 'POST',
+            body: formData,
+          });
 
-        if (!response.ok) {
-          console.error(`Failed to upload ${file.name}:`, await response.text());
-        } else {
-          const data = await response.json();
-          setAttachments(prev => [...prev, data.attachment]);
+          if (!response.ok) {
+            console.error(`Failed to upload ${file.name}:`, await response.text());
+          } else {
+            const data = await response.json();
+            setAttachments(prev => [...prev, data.attachment]);
+          }
+        } catch (error) {
+          console.error(`Error uploading ${file.name}:`, error);
         }
-      } catch (error) {
-        console.error(`Error uploading ${file.name}:`, error);
       }
+      setPendingFiles([]);
+    } finally {
+      setUploadingFile(false);
     }
-    setPendingFiles([]);
   };
 
   return (
@@ -239,6 +257,30 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit }) {
             readOnly={submitting || loading}
           />
           {errors.content && <span className="error-text">{errors.content}</span>}
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="workspace">
+            Workspace <span className="required">*</span>
+          </label>
+          <select
+            id="workspace"
+            value={workspaceId}
+            onChange={(event) => setWorkspaceId(event.target.value)}
+            disabled={submitting || loading || workspaces.length === 0}
+            className={errors.workspaceId ? 'input-error' : ''}
+          >
+            <option value="" disabled>
+              {workspaces.length === 0 ? 'No workspaces available' : 'Select a workspace'}
+            </option>
+            {workspaces.map((workspace) => (
+              <option key={workspace.id} value={workspace.id}>
+                {workspace.name}
+              </option>
+            ))}
+          </select>
+          <p className="select-hint">Articles stay organized inside their workspace.</p>
+          {errors.workspaceId && <span className="error-text">{errors.workspaceId}</span>}
         </div>
 
         <div className="form-group">
@@ -347,6 +389,20 @@ ArticleEditor.propTypes = {
     author: PropTypes.string,
   }),
   isEdit: PropTypes.bool,
+  workspaces: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      name: PropTypes.string.isRequired,
+    })
+  ),
+  defaultWorkspaceId: PropTypes.string,
+};
+
+ArticleEditor.defaultProps = {
+  article: null,
+  isEdit: false,
+  workspaces: [],
+  defaultWorkspaceId: '',
 };
 
 export default ArticleEditor;

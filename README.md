@@ -107,7 +107,7 @@ npm run dev
 ### Articles
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/articles` | List all articles |
+| GET | `/api/articles?workspaceId=<id>` | List articles (optionally filter by workspace) |
 | GET | `/api/articles/:id` | Get specific article |
 | POST | `/api/articles` | Create new article |
 | PUT | `/api/articles/:id` | Update article |
@@ -119,6 +119,22 @@ npm run dev
 | POST | `/api/articles/:id/attachments` | Upload file attachment |
 | GET | `/api/articles/:id/attachments/:attachmentId` | View/download attachment |
 | DELETE | `/api/articles/:id/attachments/:attachmentId` | Delete attachment |
+
+### Comments
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/articles/:id/comments` | List comments for an article |
+| POST | `/api/articles/:id/comments` | Create a comment |
+| PUT | `/api/articles/:id/comments/:commentId` | Update a comment |
+| DELETE | `/api/articles/:id/comments/:commentId` | Delete a comment |
+
+### Workspaces
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/workspaces` | List workspaces with article counts |
+| POST | `/api/workspaces` | Create a workspace |
+| PUT | `/api/workspaces/:id` | Update workspace metadata |
+| DELETE | `/api/workspaces/:id` | Delete workspace (must be empty) |
 
 ### Create Article Example
 
@@ -138,11 +154,15 @@ curl -X POST http://localhost:3000/api/articles \
 │   │   └── database.cjs       # Sequelize CLI configuration
 │   ├── models/
 │   │   ├── index.js           # Sequelize connection
-│   │   └── Article.js         # Article model
+│   │   ├── Article.js         # Article model
+│   │   ├── Attachment.js      # Attachment blobs
+│   │   ├── Workspace.js       # Workspace metadata
+│   │   └── Comment.js         # Article comments
 │   ├── migrations/
 │   │   └── *-create-articles-table.cjs  # Database migrations
 │   ├── routes/
-│   │   └── articles.js        # API routes + database queries
+│   │   ├── articles.js        # Article + comment routes
+│   │   └── workspaces.js      # Workspace CRUD routes
 │   ├── utils/
 │   │   ├── fileSystem.js      # File operations for attachments
 │   │   ├── websocket.js       # WebSocket notifications
@@ -155,6 +175,8 @@ curl -X POST http://localhost:3000/api/articles \
 │   │   ├── ArticleList.jsx
 │   │   ├── ArticleView.jsx    # + attachment display
 │   │   ├── ArticleEditor.jsx  # + file upload UI
+│   │   ├── WorkspaceSwitcher.jsx
+│   │   └── CommentSection.jsx
 │   │   └── NotificationDisplay.jsx  # Real-time notifications
 │   ├── hooks/
 │   │   └── useWebSocket.js    # WebSocket hook
@@ -168,6 +190,8 @@ curl -X POST http://localhost:3000/api/articles \
 - RESTful API with Express
 - **PostgreSQL database with Sequelize ORM**
 - Database migrations for easy setup
+- Workspace-aware article organization (General/Product/Engineering by default)
+- Nested comment persistence with CRUD endpoints
 - Input validation (title, content, files)
 - Error handling
 - CORS enabled
@@ -185,6 +209,7 @@ curl -X POST http://localhost:3000/api/articles \
 ### Frontend
 - Article list view (card grid)
 - Article detail view
+- Workspace switcher with contextual article filtering
 - WYSIWYG editor for creating/editing articles
 - Form validation
 - Error handling with user-friendly messages
@@ -295,11 +320,12 @@ npm run db:migrate:status # Check migration status
 ## Notes
 
 - **Articles are stored in PostgreSQL database** using Sequelize ORM
-- File attachments are stored in `backend/data/attachments/` directory
-- Attachment metadata is stored in database as JSONB
+- File attachments are stored directly in the PostgreSQL `attachments` table (BLOB)
+- Attachment metadata lives alongside the binary payload inside the same table
 - Attachment filename format: `{articleId}_{timestamp}_{originalName}`
 - WebSocket runs on the same port as HTTP server at path `/ws`
 - Database uses UUID for article IDs with automatic timestamps
+- Comments and workspaces are fully persisted in PostgreSQL (see migrations `3-5`)
 - Migrations ensure database schema consistency across environments
 
 ## New Features Guide
