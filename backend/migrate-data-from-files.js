@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Article from './models/Article.js';
+import Workspace from './models/Workspace.js';
 import { sequelize } from './models/index.js';
 
 const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data');
@@ -10,6 +11,12 @@ const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data')
 async function migrateData() {
   try {
     await sequelize.authenticate();
+    const defaultWorkspace = await Workspace.findOne({ where: { slug: 'general' } }) ||
+      await Workspace.findOne();
+
+    if (!defaultWorkspace) {
+      throw new Error('No workspaces found; run migrations first');
+    }
     const files = await fs.readdir(DATA_DIR);
     const jsonFiles = files.filter(file => file.endsWith('.json'));
 
@@ -27,7 +34,8 @@ async function migrateData() {
       await Article.create({
         title: article.title,
         content: article.content,
-        author: article.author || 'Anonymous'
+        author: article.author || 'Anonymous',
+        workspaceId: defaultWorkspace.id
       });
       
       console.log(`✓ ${article.title}`);
