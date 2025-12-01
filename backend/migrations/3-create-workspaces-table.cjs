@@ -1,36 +1,5 @@
 'use strict';
 
-const GENERAL_WORKSPACE_ID = '00000000-0000-0000-0000-000000000001';
-const PRODUCT_WORKSPACE_ID = '00000000-0000-0000-0000-000000000002';
-const ENGINEERING_WORKSPACE_ID = '00000000-0000-0000-0000-000000000003';
-
-const DEFAULT_WORKSPACES = [
-  {
-    id: GENERAL_WORKSPACE_ID,
-    name: 'General',
-    slug: 'general',
-    description: 'Default workspace for uncategorized articles',
-    created_at: new Date(),
-    updated_at: new Date()
-  },
-  {
-    id: PRODUCT_WORKSPACE_ID,
-    name: 'Product',
-    slug: 'product',
-    description: 'Articles related to product management and launches',
-    created_at: new Date(),
-    updated_at: new Date()
-  },
-  {
-    id: ENGINEERING_WORKSPACE_ID,
-    name: 'Engineering',
-    slug: 'engineering',
-    description: 'Engineering runbooks, RFCs, and technical updates',
-    created_at: new Date(),
-    updated_at: new Date()
-  }
-];
-
 module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('workspaces', {
@@ -67,8 +36,6 @@ module.exports = {
     await queryInterface.addIndex('workspaces', ['name'], {
       name: 'workspaces_name_idx'
     });
-
-    await queryInterface.bulkInsert('workspaces', DEFAULT_WORKSPACES);
   },
 
   async down(queryInterface) {

@@ -1,0 +1,18 @@
+export const formatWorkspace = (workspace) =>
+  workspace
+    ? {
+        id: workspace.id,
+        name: workspace.name,
+        slug: workspace.slug,
+        description: workspace.description,
+      }
+    : null;
+
+export const formatComment = (comment) => ({
+  id: comment.id,
+  author: comment.author,
+  content: comment.content,
+  createdAt: comment.createdAt,
+  updatedAt: comment.updatedAt,
+});
+

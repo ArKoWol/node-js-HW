@@ -55,6 +55,7 @@ cd ..
    ```bash
    cd backend
    npm run db:migrate
+   npm run db:seed:all
    cd ..
    ```
 
@@ -191,6 +192,7 @@ curl -X POST http://localhost:3000/api/articles \
 - **PostgreSQL database with Sequelize ORM**
 - Database migrations for easy setup
 - Workspace-aware article organization (General/Product/Engineering by default)
+- Default workspaces are provisioned via `npm run db:seed:all`
 - Nested comment persistence with CRUD endpoints
 - Input validation (title, content, files)
 - Error handling
