@@ -1,6 +1,7 @@
 import { DataTypes } from 'sequelize';
 import sequelize from './index.js';
 import Attachment from './Attachment.js';
+import ArticleVersion from './ArticleVersion.js';
 
 const Article = sequelize.define('Article', {
   id: {
@@ -44,6 +45,15 @@ const Article = sequelize.define('Article', {
     type: DataTypes.UUID,
     allowNull: false,
     field: 'workspace_id'
+  },
+  currentVersionNumber: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 1,
+    field: 'current_version_number',
+    validate: {
+      min: 1
+    }
   }
 }, {
   tableName: 'articles',
@@ -69,6 +79,17 @@ Article.hasMany(Attachment, {
 });
 
 Attachment.belongsTo(Article, {
+  foreignKey: 'articleId',
+  as: 'article'
+});
+
+Article.hasMany(ArticleVersion, {
+  foreignKey: 'articleId',
+  as: 'versions',
+  onDelete: 'CASCADE'
+});
+
+ArticleVersion.belongsTo(Article, {
   foreignKey: 'articleId',
   as: 'article'
 });

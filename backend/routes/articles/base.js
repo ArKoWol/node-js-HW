@@ -1,13 +1,20 @@
 import Article from '../../models/Article.js';
+import ArticleVersion from '../../models/ArticleVersion.js';
 import Attachment from '../../models/Attachment.js';
 import Workspace from '../../models/Workspace.js';
 import Comment from '../../models/Comment.js';
+import sequelize from '../../models/index.js';
 import {
   notifyArticleCreated,
   notifyArticleUpdated,
   notifyArticleDeleted,
 } from '../../utils/notifications.js';
-import { formatWorkspace, formatComment } from './helpers.js';
+import { formatWorkspace, formatComment, formatVersionMetadata } from './helpers.js';
+
+const mapVersionHistory = (versions = []) =>
+  (versions || [])
+    .map(formatVersionMetadata)
+    .sort((a, b) => b.versionNumber - a.versionNumber);
 
 function registerBaseRoutes(router) {
   router.get('/', async (req, res, next) => {
@@ -87,6 +94,13 @@ function registerBaseRoutes(router) {
             separate: true,
             order: [['createdAt', 'DESC']],
           },
+          {
+            model: ArticleVersion,
+            as: 'versions',
+            attributes: ['id', 'versionNumber', 'title', 'author', 'createdAt'],
+            separate: true,
+            order: [['versionNumber', 'DESC']],
+          },
         ],
       });
 
@@ -110,6 +124,8 @@ function registerBaseRoutes(router) {
           attachments: article.attachments || [],
           workspace: formatWorkspace(article.workspace),
           comments: (article.comments || []).map(formatComment),
+          currentVersionNumber: article.currentVersionNumber,
+          versions: mapVersionHistory(article.versions),
         },
       });
     } catch (error) {
@@ -176,11 +192,23 @@ function registerBaseRoutes(router) {
         });
       }
 
-      const article = await Article.create({
-        title: title.trim(),
-        content: content.trim(),
-        author: author?.trim() || 'Anonymous',
-        workspaceId: workspace.id,
+      const { createdArticle: article, version } = await sequelize.transaction(async (transaction) => {
+        const createdArticle = await Article.create({
+          title: title.trim(),
+          content: content.trim(),
+          author: author?.trim() || 'Anonymous',
+          workspaceId: workspace.id,
+        }, { transaction });
+
+        const versionRecord = await ArticleVersion.create({
+          articleId: createdArticle.id,
+          versionNumber: 1,
+          title: createdArticle.title,
+          content: createdArticle.content,
+          author: createdArticle.author,
+        }, { transaction });
+
+        return { createdArticle, version: versionRecord };
       });
 
       notifyArticleCreated({
@@ -203,6 +231,8 @@ function registerBaseRoutes(router) {
           attachments: [],
           workspace: formatWorkspace(workspace),
           comments: [],
+          currentVersionNumber: article.currentVersionNumber,
+          versions: mapVersionHistory([version]),
         },
       });
     } catch (error) {
@@ -291,15 +321,34 @@ function registerBaseRoutes(router) {
         payload.workspaceId = updatedWorkspace.id;
       }
 
-      await article.update(payload);
+      const updatedArticleId = await sequelize.transaction(async (transaction) => {
+        await article.reload({ transaction, lock: transaction.LOCK.UPDATE });
 
-      notifyArticleUpdated({
-        id: article.id,
-        title: article.title,
-        updatedAt: article.updatedAt,
+        const nextVersionNumber = (article.currentVersionNumber || 1) + 1;
+
+        const targetAuthor = payload.author || article.author;
+        const targetWorkspaceId = payload.workspaceId || article.workspaceId;
+
+        await ArticleVersion.create({
+          articleId: article.id,
+          versionNumber: nextVersionNumber,
+          title: payload.title,
+          content: payload.content,
+          author: targetAuthor,
+        }, { transaction });
+
+        await article.update({
+          title: payload.title,
+          content: payload.content,
+          author: targetAuthor,
+          workspaceId: targetWorkspaceId,
+          currentVersionNumber: nextVersionNumber,
+        }, { transaction });
+
+        return article.id;
       });
 
-      const updatedArticle = await Article.findByPk(article.id, {
+      const updatedArticle = await Article.findByPk(updatedArticleId, {
         include: [
           {
             model: Workspace,
@@ -324,7 +373,20 @@ function registerBaseRoutes(router) {
             separate: true,
             order: [['createdAt', 'DESC']],
           },
+          {
+            model: ArticleVersion,
+            as: 'versions',
+            attributes: ['id', 'versionNumber', 'title', 'author', 'createdAt'],
+            separate: true,
+            order: [['versionNumber', 'DESC']],
+          },
         ],
+      });
+
+      notifyArticleUpdated({
+        id: updatedArticle.id,
+        title: updatedArticle.title,
+        updatedAt: updatedArticle.updatedAt,
       });
 
       res.json({
@@ -340,6 +402,8 @@ function registerBaseRoutes(router) {
           attachments: updatedArticle.attachments || [],
           workspace: formatWorkspace(updatedArticle.workspace),
           comments: (updatedArticle.comments || []).map(formatComment),
+          currentVersionNumber: updatedArticle.currentVersionNumber,
+          versions: mapVersionHistory(updatedArticle.versions),
         },
       });
     } catch (error) {
@@ -378,6 +442,63 @@ function registerBaseRoutes(router) {
         success: true,
         message: 'Article deleted successfully',
         deletedId: id,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/:id/versions/:versionNumber', async (req, res, next) => {
+    try {
+      const { id, versionNumber } = req.params;
+      const parsedVersion = Number(versionNumber);
+
+      if (Number.isNaN(parsedVersion) || parsedVersion < 1) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid version number',
+          status: 400,
+        });
+      }
+
+      const article = await Article.findByPk(id, {
+        attributes: ['id', 'currentVersionNumber'],
+      });
+
+      if (!article) {
+        return res.status(404).json({
+          success: false,
+          error: 'Article not found',
+          status: 404,
+        });
+      }
+
+      const version = await ArticleVersion.findOne({
+        where: {
+          articleId: id,
+          versionNumber: parsedVersion,
+        },
+      });
+
+      if (!version) {
+        return res.status(404).json({
+          success: false,
+          error: 'Version not found',
+          status: 404,
+        });
+      }
+
+      res.json({
+        success: true,
+        version: {
+          versionNumber: version.versionNumber,
+          title: version.title,
+          content: version.content,
+          author: version.author,
+          createdAt: version.createdAt,
+          updatedAt: version.updatedAt,
+          isLatest: version.versionNumber === article.currentVersionNumber,
+        },
       });
     } catch (error) {
       next(error);
