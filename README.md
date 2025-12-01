@@ -58,6 +58,7 @@ cd ..
    npm run db:seed:all
    cd ..
    ```
+   > Tip: The version history feature relies on the new `article_versions` table, so rerun `npm run db:migrate` after pulling these changes.
 
 ## Running the Application
 
@@ -114,6 +115,13 @@ npm run dev
 | PUT | `/api/articles/:id` | Update article |
 | DELETE | `/api/articles/:id` | Delete article |
 
+### Article Versions
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/articles/:id/versions/:versionNumber` | Fetch a read-only snapshot of a specific article version |
+
+`GET /api/articles/:id` responses now also include `currentVersionNumber` and a `versions` array so the UI can populate the version selector.
+
 ### Attachments
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -156,11 +164,13 @@ curl -X POST http://localhost:3000/api/articles \
 │   ├── models/
 │   │   ├── index.js           # Sequelize connection
 │   │   ├── Article.js         # Article model
+│   │   ├── ArticleVersion.js  # Immutable article snapshots
 │   │   ├── Attachment.js      # Attachment blobs
 │   │   ├── Workspace.js       # Workspace metadata
 │   │   └── Comment.js         # Article comments
 │   ├── migrations/
-│   │   └── *-create-articles-table.cjs  # Database migrations
+│   │   ├── *-create-articles-table.cjs  # Database migrations
+│   │   └── 6-create-article-versions-table.cjs
 │   ├── routes/
 │   │   ├── articles.js        # Article + comment routes
 │   │   └── workspaces.js      # Workspace CRUD routes
@@ -191,6 +201,7 @@ curl -X POST http://localhost:3000/api/articles \
 - RESTful API with Express
 - **PostgreSQL database with Sequelize ORM**
 - Database migrations for easy setup
+- Article versioning (each update becomes a new immutable snapshot)
 - Workspace-aware article organization (General/Product/Engineering by default)
 - Default workspaces are provisioned via `npm run db:seed:all`
 - Nested comment persistence with CRUD endpoints
@@ -212,6 +223,7 @@ curl -X POST http://localhost:3000/api/articles \
 - Article list view (card grid)
 - Article detail view
 - Workspace switcher with contextual article filtering
+- Version history dropdown with read-only indicators for older snapshots
 - WYSIWYG editor for creating/editing articles
 - Form validation
 - Error handling with user-friendly messages
@@ -358,4 +370,11 @@ npm run db:migrate:status # Check migration status
 - Notifications auto-dismiss after 5 seconds
 - Click ✕ to dismiss manually
 - WebSocket status indicator in header shows connection status
+
+### Article Version History
+
+1. Open any article to see the **Version** dropdown in the header. Each option shows the version number and the time it was created.
+2. Selecting an older version fetches a read-only snapshot. A banner warns that editing is disabled until you switch back to the latest version.
+3. Use the **View latest** button in the banner (or pick the newest version in the dropdown) to return to the editable view.
+4. Every update automatically appends a new version, so no extra steps are needed when saving changes.
 
