@@ -20,6 +20,15 @@ function App() {
   const [workspacesLoading, setWorkspacesLoading] = useState(false);
   const [workspacesError, setWorkspacesError] = useState(null);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
+  const [viewingVersion, setViewingVersion] = useState(null);
+  const [versionLoading, setVersionLoading] = useState(false);
+  const [selectedVersionNumber, setSelectedVersionNumber] = useState(null);
+
+  const resetVersionState = () => {
+    setViewingVersion(null);
+    setSelectedVersionNumber(null);
+    setVersionLoading(false);
+  };
 
   const fetchWorkspaces = useCallback(async () => {
     setWorkspacesLoading(true);
@@ -111,6 +120,7 @@ function App() {
       }
       const data = await response.json();
       setSelectedArticle(data.article);
+      resetVersionState();
       setView('view');
     } catch (err) {
       setError(err.message);
@@ -142,6 +152,7 @@ function App() {
       await fetchArticles(workspaceId);
       await fetchWorkspaces();
       setView('list');
+      resetVersionState();
       return { success: true, articleId: data.article.id };
     } catch (err) {
       setError(err.message);
@@ -174,6 +185,7 @@ function App() {
       await fetchArticles(workspaceId);
       await fetchWorkspaces();
       setSelectedArticle(data.article);
+      resetVersionState();
       setView('view');
       return { success: true };
     } catch (err) {
@@ -207,6 +219,7 @@ function App() {
       await fetchWorkspaces();
       setView('list');
       setSelectedArticle(null);
+      resetVersionState();
     } catch (err) {
       setError(err.message);
       console.error('Error deleting article:', err);
@@ -219,16 +232,19 @@ function App() {
     setView('list');
     setSelectedArticle(null);
     setError(null);
+    resetVersionState();
   };
 
   const handleCreateNew = () => {
     setView('create');
     setError(null);
+    resetVersionState();
   };
 
   const handleEditMode = () => {
     setView('edit');
     setError(null);
+    resetVersionState();
   };
 
   const handleAddComment = async (articleId, commentData) => {
@@ -310,6 +326,39 @@ function App() {
     }
   };
 
+  const handleVersionChange = async (versionNumber) => {
+    if (!selectedArticle) {
+      return;
+    }
+
+    if (versionNumber === selectedArticle.currentVersionNumber) {
+      resetVersionState();
+      return;
+    }
+
+    setSelectedVersionNumber(versionNumber);
+    setVersionLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/articles/${selectedArticle.id}/versions/${versionNumber}`);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load version');
+      }
+      setViewingVersion(data.version);
+    } catch (err) {
+      setError(err.message);
+      console.error('Error loading version:', err);
+      setSelectedVersionNumber(viewingVersion?.versionNumber || null);
+    } finally {
+      setVersionLoading(false);
+    }
+  };
+
+  const handleVersionReset = () => {
+    resetVersionState();
+  };
+
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) || null;
 
   return (
@@ -337,6 +386,7 @@ function App() {
           onSelect={(workspaceId) => {
             setActiveWorkspaceId(workspaceId);
             setSelectedArticle(null);
+            resetVersionState();
             setView('list');
           }}
           onRefresh={fetchWorkspaces}
@@ -366,6 +416,11 @@ function App() {
           <ArticleView
             article={selectedArticle}
             loading={loading}
+            versionOverride={viewingVersion}
+            versionLoading={versionLoading}
+            selectedVersionNumber={selectedVersionNumber}
+            onVersionChange={handleVersionChange}
+            onVersionReset={handleVersionReset}
             onEdit={handleEditMode}
             onDelete={handleDeleteArticle}
             onAddComment={(commentData) => handleAddComment(selectedArticle.id, commentData)}
