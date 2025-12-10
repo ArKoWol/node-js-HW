@@ -36,7 +36,7 @@ function registerBaseRoutes(router) {
 
       const articles = await Article.findAll({
         where: workspaceFilter,
-        attributes: ['id', 'title', 'content', 'createdAt'],
+        attributes: ['id', 'currentVersionNumber', 'createdAt'],
         order: [['createdAt', 'DESC']],
         include: [
           {
@@ -47,11 +47,31 @@ function registerBaseRoutes(router) {
         ],
       });
 
-      const articlesWithSummary = articles.map((article) => ({
+      // Get current versions for all articles
+      const articlesWithVersions = await Promise.all(
+        articles.map(async (article) => {
+          const currentVersion = await ArticleVersion.findOne({
+            where: {
+              articleId: article.id,
+              versionNumber: article.currentVersionNumber,
+            },
+            attributes: ['title', 'content'],
+          });
+
+          return {
+            article,
+            version: currentVersion,
+          };
+        })
+      );
+
+      const articlesWithSummary = articlesWithVersions.map(({ article, version }) => ({
         id: article.id,
-        title: article.title,
+        title: version?.title || 'Untitled',
         createdAt: article.createdAt,
-        summary: article.content.substring(0, 150).replace(/<[^>]*>/g, '') + '...',
+        summary: version?.content 
+          ? version.content.substring(0, 150).replace(/<[^>]*>/g, '') + '...'
+          : 'No content',
         workspace: formatWorkspace(article.workspace),
       }));
 
@@ -71,17 +91,6 @@ function registerBaseRoutes(router) {
 
       const article = await Article.findByPk(id, {
         include: [
-          {
-            model: Attachment,
-            as: 'attachments',
-            attributes: [
-              'id',
-              'filename',
-              ['mime_type', 'mimeType'],
-              'size',
-              ['created_at', 'createdAt'],
-            ],
-          },
           {
             model: Workspace,
             as: 'workspace',
@@ -112,16 +121,45 @@ function registerBaseRoutes(router) {
         });
       }
 
+      // Get current version with attachments
+      const currentVersion = await ArticleVersion.findOne({
+        where: {
+          articleId: id,
+          versionNumber: article.currentVersionNumber,
+        },
+        include: [
+          {
+            model: Attachment,
+            as: 'attachments',
+            attributes: [
+              'id',
+              'filename',
+              ['mime_type', 'mimeType'],
+              'size',
+              ['created_at', 'createdAt'],
+            ],
+          },
+        ],
+      });
+
+      if (!currentVersion) {
+        return res.status(404).json({
+          success: false,
+          error: 'Current version not found',
+          status: 404,
+        });
+      }
+
       res.json({
         success: true,
         article: {
           id: article.id,
-          title: article.title,
-          content: article.content,
-          author: article.author,
+          title: currentVersion.title,
+          content: currentVersion.content,
+          author: currentVersion.author,
           createdAt: article.createdAt,
           updatedAt: article.updatedAt,
-          attachments: article.attachments || [],
+          attachments: currentVersion.attachments || [],
           workspace: formatWorkspace(article.workspace),
           comments: (article.comments || []).map(formatComment),
           currentVersionNumber: article.currentVersionNumber,
@@ -193,19 +231,19 @@ function registerBaseRoutes(router) {
       }
 
       const { createdArticle: article, version } = await sequelize.transaction(async (transaction) => {
+        // Create article with minimal data - content comes from version
         const createdArticle = await Article.create({
-          title: title.trim(),
-          content: content.trim(),
-          author: author?.trim() || 'Anonymous',
           workspaceId: workspace.id,
+          currentVersionNumber: 1,
         }, { transaction });
 
+        // Create version 1 with actual content
         const versionRecord = await ArticleVersion.create({
           articleId: createdArticle.id,
           versionNumber: 1,
-          title: createdArticle.title,
-          content: createdArticle.content,
-          author: createdArticle.author,
+          title: title.trim(),
+          content: content.trim(),
+          author: author?.trim() || 'Anonymous',
         }, { transaction });
 
         return { createdArticle, version: versionRecord };
@@ -223,9 +261,9 @@ function registerBaseRoutes(router) {
         message: 'Article created successfully',
         article: {
           id: article.id,
-          title: article.title,
-          content: article.content,
-          author: article.author,
+          title: version.title,
+          content: version.content,
+          author: version.author,
           createdAt: article.createdAt,
           updatedAt: article.updatedAt,
           attachments: [],
@@ -326,9 +364,20 @@ function registerBaseRoutes(router) {
 
         const nextVersionNumber = (article.currentVersionNumber || 1) + 1;
 
-        const targetAuthor = payload.author || article.author;
         const targetWorkspaceId = payload.workspaceId || article.workspaceId;
 
+        // Get current version to preserve author if not provided
+        const currentVersion = await ArticleVersion.findOne({
+          where: {
+            articleId: article.id,
+            versionNumber: article.currentVersionNumber,
+          },
+          transaction,
+        });
+
+        const targetAuthor = payload.author || currentVersion?.author || 'Anonymous';
+
+        // Create new version with content - this is the source of truth
         await ArticleVersion.create({
           articleId: article.id,
           versionNumber: nextVersionNumber,
@@ -337,10 +386,8 @@ function registerBaseRoutes(router) {
           author: targetAuthor,
         }, { transaction });
 
+        // Update article metadata only - content comes from version
         await article.update({
-          title: payload.title,
-          content: payload.content,
-          author: targetAuthor,
           workspaceId: targetWorkspaceId,
           currentVersionNumber: nextVersionNumber,
         }, { transaction });
@@ -354,17 +401,6 @@ function registerBaseRoutes(router) {
             model: Workspace,
             as: 'workspace',
             attributes: ['id', 'name', 'slug', 'description'],
-          },
-          {
-            model: Attachment,
-            as: 'attachments',
-            attributes: [
-              'id',
-              'filename',
-              ['mime_type', 'mimeType'],
-              'size',
-              ['created_at', 'createdAt'],
-            ],
           },
           {
             model: Comment,
@@ -383,9 +419,30 @@ function registerBaseRoutes(router) {
         ],
       });
 
+      // Get current version with attachments
+      const currentVersion = await ArticleVersion.findOne({
+        where: {
+          articleId: updatedArticleId,
+          versionNumber: updatedArticle.currentVersionNumber,
+        },
+        include: [
+          {
+            model: Attachment,
+            as: 'attachments',
+            attributes: [
+              'id',
+              'filename',
+              ['mime_type', 'mimeType'],
+              'size',
+              ['created_at', 'createdAt'],
+            ],
+          },
+        ],
+      });
+
       notifyArticleUpdated({
         id: updatedArticle.id,
-        title: updatedArticle.title,
+        title: currentVersion.title,
         updatedAt: updatedArticle.updatedAt,
       });
 
@@ -394,12 +451,12 @@ function registerBaseRoutes(router) {
         message: 'Article updated successfully',
         article: {
           id: updatedArticle.id,
-          title: updatedArticle.title,
-          content: updatedArticle.content,
-          author: updatedArticle.author,
+          title: currentVersion.title,
+          content: currentVersion.content,
+          author: currentVersion.author,
           createdAt: updatedArticle.createdAt,
           updatedAt: updatedArticle.updatedAt,
-          attachments: updatedArticle.attachments || [],
+          attachments: currentVersion.attachments || [],
           workspace: formatWorkspace(updatedArticle.workspace),
           comments: (updatedArticle.comments || []).map(formatComment),
           currentVersionNumber: updatedArticle.currentVersionNumber,
@@ -433,7 +490,15 @@ function registerBaseRoutes(router) {
         });
       }
 
-      const articleTitle = article.title;
+      // Get current version for title
+      const currentVersion = await ArticleVersion.findOne({
+        where: {
+          articleId: id,
+          versionNumber: article.currentVersionNumber,
+        },
+      });
+      
+      const articleTitle = currentVersion?.title || 'Article';
       await article.destroy();
 
       notifyArticleDeleted(id, articleTitle);
@@ -478,6 +543,19 @@ function registerBaseRoutes(router) {
           articleId: id,
           versionNumber: parsedVersion,
         },
+        include: [
+          {
+            model: Attachment,
+            as: 'attachments',
+            attributes: [
+              'id',
+              'filename',
+              ['mime_type', 'mimeType'],
+              'size',
+              ['created_at', 'createdAt'],
+            ],
+          },
+        ],
       });
 
       if (!version) {
@@ -497,6 +575,7 @@ function registerBaseRoutes(router) {
           author: version.author,
           createdAt: version.createdAt,
           updatedAt: version.updatedAt,
+          attachments: version.attachments || [],
           isLatest: version.versionNumber === article.currentVersionNumber,
         },
       });

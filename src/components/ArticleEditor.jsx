@@ -3,8 +3,10 @@ import PropTypes from 'prop-types';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import './ArticleEditor.css';
+import { useAuth } from '../contexts/AuthContext';
 
 function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit, workspaces, defaultWorkspaceId }) {
+  const { getAuthHeaders } = useAuth();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [author, setAuthor] = useState('');
@@ -67,8 +69,14 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit, workspace
         `http://localhost:3000/api/articles/${article.id}/attachments/${attachmentId}`,
         {
           method: 'DELETE',
+          headers: getAuthHeaders()
         }
       );
+
+      if (response.status === 401) {
+        setUploadError('Authentication required');
+        return;
+      }
 
       const data = await response.json();
 
@@ -187,6 +195,7 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit, workspace
 
           const response = await fetch(`http://localhost:3000/api/articles/${targetArticleId}/attachments`, {
             method: 'POST',
+            headers: getAuthHeaders(),
             body: formData,
           });
 

@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import './ArticleView.css';
 import CommentSection from './CommentSection';
+import { useAuth } from '../contexts/AuthContext';
 
 function ArticleView({
   article,
@@ -16,6 +17,7 @@ function ArticleView({
   onUpdateComment,
   onDeleteComment,
 }) {
+  const { getAuthHeaders } = useAuth();
   if (loading) {
     return (
       <div className="loading-container">
@@ -44,10 +46,26 @@ function ArticleView({
   );
   const versionOptions = article.versions || [];
 
-  const handleAttachmentClick = (attachment) => {
+  const handleAttachmentClick = async (attachment) => {
     const API_URL = 'http://localhost:3000/api';
-    const url = `${API_URL}/articles/${article.id}/attachments/${attachment.id}`;
-    window.open(url, '_blank');
+    try {
+      const response = await fetch(`${API_URL}/articles/${article.id}/attachments/${attachment.id}`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        // Clean up the object URL after a delay
+        setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      } else {
+        alert('Failed to load attachment. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error loading attachment:', error);
+      alert('Failed to load attachment. Please try again.');
+    }
   };
 
   const getAttachmentIcon = (mimeType) => {
