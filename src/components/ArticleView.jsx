@@ -56,7 +56,7 @@ function ArticleView({
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
-        window.open(url, '_blank');
+    window.open(url, '_blank');
         // Clean up the object URL after a delay
         setTimeout(() => window.URL.revokeObjectURL(url), 100);
       } else {

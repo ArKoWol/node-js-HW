@@ -173,7 +173,8 @@ function registerBaseRoutes(router) {
 
   router.post('/', async (req, res, next) => {
     try {
-      const { title, content, author, workspaceId } = req.body;
+      const { title, content, workspaceId } = req.body;
+      const author = req.user.email;
 
       if (!title || typeof title !== 'string' || title.trim().length === 0) {
         return res.status(400).json({
@@ -243,7 +244,7 @@ function registerBaseRoutes(router) {
           versionNumber: 1,
           title: title.trim(),
           content: content.trim(),
-          author: author?.trim() || 'Anonymous',
+          author: author,
         }, { transaction });
 
         return { createdArticle, version: versionRecord };
@@ -251,8 +252,8 @@ function registerBaseRoutes(router) {
 
       notifyArticleCreated({
         id: article.id,
-        title: article.title,
-        author: article.author,
+        title: version.title,
+        author: version.author,
         createdAt: article.createdAt,
       });
 
@@ -289,7 +290,8 @@ function registerBaseRoutes(router) {
   router.put('/:id', async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { title, content, author, workspaceId } = req.body;
+      const { title, content, workspaceId } = req.body;
+      const author = req.user.email;
 
       const article = await Article.findByPk(id);
 
@@ -352,7 +354,7 @@ function registerBaseRoutes(router) {
       const payload = {
         title: title.trim(),
         content: content.trim(),
-        author: author?.trim() || article.author,
+        author: author, // Use logged-in user's email
       };
 
       if (updatedWorkspace) {
@@ -366,16 +368,7 @@ function registerBaseRoutes(router) {
 
         const targetWorkspaceId = payload.workspaceId || article.workspaceId;
 
-        // Get current version to preserve author if not provided
-        const currentVersion = await ArticleVersion.findOne({
-          where: {
-            articleId: article.id,
-            versionNumber: article.currentVersionNumber,
-          },
-          transaction,
-        });
-
-        const targetAuthor = payload.author || currentVersion?.author || 'Anonymous';
+        const targetAuthor = payload.author;
 
         // Create new version with content - this is the source of truth
         await ArticleVersion.create({

@@ -4,6 +4,7 @@ import ArticleList from './components/ArticleList';
 import ArticleView from './components/ArticleView';
 import ArticleEditor from './components/ArticleEditor';
 import NotificationDisplay from './components/NotificationDisplay';
+import ConfirmDialog from './components/ConfirmDialog';
 import { useWebSocket } from './hooks/useWebSocket';
 import WorkspaceSwitcher from './components/WorkspaceSwitcher';
 import { useAuth } from './contexts/AuthContext';
@@ -28,6 +29,7 @@ function App() {
   const [viewingVersion, setViewingVersion] = useState(null);
   const [versionLoading, setVersionLoading] = useState(false);
   const [selectedVersionNumber, setSelectedVersionNumber] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, articleId: null });
 
   const resetVersionState = () => {
     setViewingVersion(null);
@@ -242,10 +244,13 @@ function App() {
     }
   };
 
-  const handleDeleteArticle = async (articleId) => {
-    if (!window.confirm('Are you sure you want to delete this article? This action cannot be undone.')) {
-      return;
-    }
+  const handleDeleteArticle = (articleId) => {
+    setDeleteConfirm({ isOpen: true, articleId });
+  };
+
+  const confirmDeleteArticle = async () => {
+    const { articleId } = deleteConfirm;
+    setDeleteConfirm({ isOpen: false, articleId: null });
 
     setLoading(true);
     setError(null);
@@ -277,6 +282,10 @@ function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const cancelDeleteArticle = () => {
+    setDeleteConfirm({ isOpen: false, articleId: null });
   };
 
   const handleBackToList = () => {
@@ -347,6 +356,11 @@ function App() {
         logout();
         return { success: false, error: 'Authentication required' };
       }
+
+      if (response.status === 403) {
+        const data = await response.json();
+        return { success: false, error: data.error || 'You can only edit your own comments' };
+      }
       
       const data = await response.json();
       if (!response.ok) {
@@ -378,6 +392,11 @@ function App() {
       if (response.status === 401) {
         logout();
         return { success: false, error: 'Authentication required' };
+      }
+
+      if (response.status === 403) {
+        const data = await response.json();
+        return { success: false, error: data.error || 'You can only delete your own comments' };
       }
       
       const data = await response.json();
@@ -579,6 +598,16 @@ function App() {
           />
         ))}
       </div>
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Article"
+        message="Are you sure you want to delete this article? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDeleteArticle}
+        onCancel={cancelDeleteArticle}
+      />
     </div>
   );
 }

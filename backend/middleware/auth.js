@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
@@ -7,7 +8,7 @@ export const generateToken = (userId) => {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 };
 
-export const verifyToken = (req, res, next) => {
+export const verifyToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     
@@ -32,6 +33,20 @@ export const verifyToken = (req, res, next) => {
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
       req.userId = decoded.userId;
+      
+      const user = await User.findByPk(decoded.userId);
+      if (!user) {
+        return res.status(401).json({ 
+          error: 'User not found',
+          status: 401 
+        });
+      }
+      
+      req.user = {
+        id: user.id,
+        email: user.email
+      };
+      
       next();
     } catch (err) {
       if (err.name === 'TokenExpiredError') {
