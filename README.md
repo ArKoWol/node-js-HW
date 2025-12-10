@@ -63,6 +63,15 @@ cd ..
    ```
    > **Note:** The version history feature relies on the `article_versions` table. After running migrations, all existing articles will have version 1 created automatically.
 
+5. **Assign Admin Role (Optional):**
+   To assign admin role to a user:
+   ```bash
+   cd backend
+   npm run assign-admin <email>
+   # Example: npm run assign-admin admin@example.com
+   ```
+   > **Note:** By default, all new users are created with the "user" role. Use this script to promote a user to admin.
+
 ## Running the Application
 
 ### Quick Start (Recommended)
@@ -157,6 +166,12 @@ npm run dev
 | PUT | `/api/workspaces/:id` | Update workspace metadata |
 | DELETE | `/api/workspaces/:id` | Delete workspace (must be empty) |
 
+### User Management (Admin Only)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/users` | List all users with their roles (admin only) |
+| PUT | `/api/users/:id/role` | Update a user's role (admin only) |
+
 ### Create Article Example
 
 ```bash
@@ -226,6 +241,12 @@ curl -X POST http://localhost:3000/api/articles \
   - Protected routes require valid JWT tokens
   - Token expiration handling
   - Secure password storage
+- **👥 Role-Based Access Control (RBAC)**
+  - Two user roles: `admin` and `user` (default)
+  - Article editing restricted to creators and admins
+  - Admin-only user management endpoints
+  - Backend enforces permissions on protected endpoints
+  - Admin assignment script for initial setup
 - **PostgreSQL database with Sequelize ORM**
 - Database migrations for easy setup
 - Article versioning (each update becomes a new immutable snapshot)
@@ -255,6 +276,12 @@ curl -X POST http://localhost:3000/api/articles \
   - JWT token stored securely in localStorage
   - Automatic token verification on app load
   - Logout functionality
+- **👥 Role-Based Access Control UI**
+  - User Management page (admin only)
+  - Role-based visibility of features
+  - Article edit permissions enforced in UI
+  - Admin can view and manage all users
+  - Role badges and indicators
 - Article list view (card grid)
 - Article detail view
 - Workspace switcher with contextual article filtering
@@ -364,6 +391,7 @@ npm run dev              # Start with auto-restart
 npm run db:migrate       # Run database migrations
 npm run db:migrate:undo  # Undo last migration
 npm run db:migrate:status # Check migration status
+npm run assign-admin     # Assign admin role to a user (requires email argument)
 ```
 
 ## Notes
@@ -376,6 +404,59 @@ npm run db:migrate:status # Check migration status
 - Database uses UUID for article IDs with automatic timestamps
 - Comments and workspaces are fully persisted in PostgreSQL (see migrations `3-5`)
 - Migrations ensure database schema consistency across environments
+
+## Role-Based Access Control (RBAC)
+
+### User Roles
+
+- **Admin**: Full access to all features including user management
+- **User**: Standard access, can create and edit their own articles
+
+### Article Permissions
+
+- **Create**: All authenticated users can create articles
+- **Edit**: Only the article creator OR an admin can edit articles
+- **Delete**: All authenticated users can delete articles (consider restricting this in production)
+- **View**: All authenticated users can view articles
+
+### Admin Features
+
+1. **User Management Page**
+   - Accessible only to admins
+   - View all users and their roles
+   - Update user roles (admin/user)
+   - Cannot remove own admin role
+
+2. **Article Editing**
+   - Admins can edit any article, regardless of creator
+
+### Assigning Admin Role
+
+To assign admin role to a user:
+
+```bash
+cd backend
+npm run assign-admin <email>
+```
+
+Example:
+```bash
+npm run assign-admin admin@example.com
+```
+
+### Backend RBAC Enforcement
+
+The backend enforces permissions on the following endpoints:
+
+- `PUT /api/articles/:id` - Checks if user is creator or admin
+- `GET /api/users` - Requires admin role
+- `PUT /api/users/:id/role` - Requires admin role
+
+### Frontend RBAC
+
+- User Management page is only visible to admins
+- Edit button is hidden for articles the user cannot edit
+- Role-based navigation and UI elements
 
 ## New Features Guide
 

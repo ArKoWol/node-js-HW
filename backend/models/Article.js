@@ -2,6 +2,7 @@ import { DataTypes } from 'sequelize';
 import sequelize from './index.js';
 import Attachment from './Attachment.js';
 import ArticleVersion from './ArticleVersion.js';
+import User from './User.js';
 
 const Article = sequelize.define('Article', {
   id: {
@@ -39,6 +40,11 @@ const Article = sequelize.define('Article', {
     validate: {
       min: 1
     }
+  },
+  creatorId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    field: 'creator_id'
   }
 }, {
   tableName: 'articles',
@@ -77,6 +83,16 @@ Article.hasMany(ArticleVersion, {
 ArticleVersion.belongsTo(Article, {
   foreignKey: 'articleId',
   as: 'article'
+});
+
+Article.belongsTo(User, {
+  foreignKey: 'creatorId',
+  as: 'creator'
+});
+
+User.hasMany(Article, {
+  foreignKey: 'creatorId',
+  as: 'articles'
 });
 
 export default Article;

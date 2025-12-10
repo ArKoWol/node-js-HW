@@ -3,6 +3,7 @@ import ArticleVersion from '../../models/ArticleVersion.js';
 import Attachment from '../../models/Attachment.js';
 import Workspace from '../../models/Workspace.js';
 import Comment from '../../models/Comment.js';
+import User from '../../models/User.js';
 import sequelize from '../../models/index.js';
 import {
   notifyArticleCreated,
@@ -36,13 +37,19 @@ function registerBaseRoutes(router) {
 
       const articles = await Article.findAll({
         where: workspaceFilter,
-        attributes: ['id', 'currentVersionNumber', 'createdAt'],
+        attributes: ['id', 'currentVersionNumber', 'createdAt', 'creatorId'],
         order: [['createdAt', 'DESC']],
         include: [
           {
             model: Workspace,
             as: 'workspace',
             attributes: ['id', 'name', 'slug'],
+          },
+          {
+            model: User,
+            as: 'creator',
+            attributes: ['id', 'email'],
+            required: false,
           },
         ],
       });
@@ -73,6 +80,7 @@ function registerBaseRoutes(router) {
           ? version.content.substring(0, 150).replace(/<[^>]*>/g, '') + '...'
           : 'No content',
         workspace: formatWorkspace(article.workspace),
+        creatorId: article.creatorId,
       }));
 
       res.json({
@@ -90,11 +98,18 @@ function registerBaseRoutes(router) {
       const { id } = req.params;
 
       const article = await Article.findByPk(id, {
+        attributes: ['id', 'currentVersionNumber', 'createdAt', 'updatedAt', 'creatorId', 'workspaceId'],
         include: [
           {
             model: Workspace,
             as: 'workspace',
             attributes: ['id', 'name', 'slug', 'description'],
+          },
+          {
+            model: User,
+            as: 'creator',
+            attributes: ['id', 'email'],
+            required: false,
           },
           {
             model: Comment,
@@ -150,13 +165,22 @@ function registerBaseRoutes(router) {
         });
       }
 
+      // Get creator email - prefer loaded relationship, fallback to direct query
+      let creatorEmail = article.creator?.email;
+      if (!creatorEmail && article.creatorId) {
+        const creator = await User.findByPk(article.creatorId, {
+          attributes: ['email'],
+        });
+        creatorEmail = creator?.email;
+      }
+
       res.json({
         success: true,
         article: {
           id: article.id,
           title: currentVersion.title,
           content: currentVersion.content,
-          author: currentVersion.author,
+          author: creatorEmail || 'Unknown',
           createdAt: article.createdAt,
           updatedAt: article.updatedAt,
           attachments: currentVersion.attachments || [],
@@ -164,6 +188,7 @@ function registerBaseRoutes(router) {
           comments: (article.comments || []).map(formatComment),
           currentVersionNumber: article.currentVersionNumber,
           versions: mapVersionHistory(article.versions),
+          creatorId: article.creatorId,
         },
       });
     } catch (error) {
@@ -173,8 +198,7 @@ function registerBaseRoutes(router) {
 
   router.post('/', async (req, res, next) => {
     try {
-      const { title, content, workspaceId } = req.body;
-      const author = req.user.email;
+      const { title, content, author, workspaceId } = req.body;
 
       if (!title || typeof title !== 'string' || title.trim().length === 0) {
         return res.status(400).json({
@@ -231,12 +255,31 @@ function registerBaseRoutes(router) {
         });
       }
 
+      if (!req.userId) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required',
+          status: 401,
+        });
+      }
+
       const { createdArticle: article, version } = await sequelize.transaction(async (transaction) => {
         // Create article with minimal data - content comes from version
-        const createdArticle = await Article.create({
+        const articleData = {
           workspaceId: workspace.id,
           currentVersionNumber: 1,
-        }, { transaction });
+          creatorId: req.userId,
+        };
+        
+        if (!req.userId) {
+          console.error('WARNING: req.userId is not set when creating article!');
+        }
+        
+        const createdArticle = await Article.create(articleData, { transaction });
+        
+        if (!createdArticle.creatorId) {
+          console.error(`WARNING: Article ${createdArticle.id} was created without creatorId!`);
+        }
 
         // Create version 1 with actual content
         const versionRecord = await ArticleVersion.create({
@@ -244,16 +287,24 @@ function registerBaseRoutes(router) {
           versionNumber: 1,
           title: title.trim(),
           content: content.trim(),
-          author: author,
+          author: author?.trim() || 'Anonymous',
         }, { transaction });
 
         return { createdArticle, version: versionRecord };
       });
 
+      let creatorEmail = req.user?.email;
+      if (!creatorEmail && article.creatorId) {
+        const creator = await User.findByPk(article.creatorId, {
+          attributes: ['email'],
+        });
+        creatorEmail = creator?.email;
+      }
+
       notifyArticleCreated({
         id: article.id,
         title: version.title,
-        author: version.author,
+        author: creatorEmail || 'Unknown',
         createdAt: article.createdAt,
       });
 
@@ -264,7 +315,7 @@ function registerBaseRoutes(router) {
           id: article.id,
           title: version.title,
           content: version.content,
-          author: version.author,
+          author: creatorEmail || 'Unknown',
           createdAt: article.createdAt,
           updatedAt: article.updatedAt,
           attachments: [],
@@ -272,6 +323,7 @@ function registerBaseRoutes(router) {
           comments: [],
           currentVersionNumber: article.currentVersionNumber,
           versions: mapVersionHistory([version]),
+          creatorId: article.creatorId,
         },
       });
     } catch (error) {
@@ -290,16 +342,28 @@ function registerBaseRoutes(router) {
   router.put('/:id', async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { title, content, workspaceId } = req.body;
-      const author = req.user.email;
+      const { title, content, author, workspaceId } = req.body;
 
-      const article = await Article.findByPk(id);
+      const article = await Article.findByPk(id, {
+        attributes: ['id', 'currentVersionNumber', 'createdAt', 'updatedAt', 'creatorId', 'workspaceId'],
+      });
 
       if (!article) {
         return res.status(404).json({
           success: false,
           error: 'Article not found',
           status: 404,
+        });
+      }
+
+      const isCreator = article.creatorId === req.userId;
+      const isAdmin = req.user?.role === 'admin';
+
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({
+          success: false,
+          error: 'You do not have permission to edit this article. Only the creator or an admin can edit articles.',
+          status: 403,
         });
       }
 
@@ -354,7 +418,7 @@ function registerBaseRoutes(router) {
       const payload = {
         title: title.trim(),
         content: content.trim(),
-        author: author, // Use logged-in user's email
+        author: author?.trim() || article.author,
       };
 
       if (updatedWorkspace) {
@@ -368,7 +432,16 @@ function registerBaseRoutes(router) {
 
         const targetWorkspaceId = payload.workspaceId || article.workspaceId;
 
-        const targetAuthor = payload.author;
+        // Get current version to preserve author if not provided
+        const currentVersion = await ArticleVersion.findOne({
+          where: {
+            articleId: article.id,
+            versionNumber: article.currentVersionNumber,
+          },
+          transaction,
+        });
+
+        const targetAuthor = payload.author || currentVersion?.author || 'Anonymous';
 
         // Create new version with content - this is the source of truth
         await ArticleVersion.create({
@@ -389,11 +462,18 @@ function registerBaseRoutes(router) {
       });
 
       const updatedArticle = await Article.findByPk(updatedArticleId, {
+        attributes: ['id', 'currentVersionNumber', 'createdAt', 'updatedAt', 'creatorId', 'workspaceId'],
         include: [
           {
             model: Workspace,
             as: 'workspace',
             attributes: ['id', 'name', 'slug', 'description'],
+          },
+          {
+            model: User,
+            as: 'creator',
+            attributes: ['id', 'email'],
+            required: false,
           },
           {
             model: Comment,
@@ -433,6 +513,14 @@ function registerBaseRoutes(router) {
         ],
       });
 
+      let creatorEmail = updatedArticle.creator?.email;
+      if (!creatorEmail && updatedArticle.creatorId) {
+        const creator = await User.findByPk(updatedArticle.creatorId, {
+          attributes: ['email'],
+        });
+        creatorEmail = creator?.email;
+      }
+
       notifyArticleUpdated({
         id: updatedArticle.id,
         title: currentVersion.title,
@@ -446,7 +534,7 @@ function registerBaseRoutes(router) {
           id: updatedArticle.id,
           title: currentVersion.title,
           content: currentVersion.content,
-          author: currentVersion.author,
+          author: creatorEmail || 'Unknown',
           createdAt: updatedArticle.createdAt,
           updatedAt: updatedArticle.updatedAt,
           attachments: currentVersion.attachments || [],
@@ -454,6 +542,7 @@ function registerBaseRoutes(router) {
           comments: (updatedArticle.comments || []).map(formatComment),
           currentVersionNumber: updatedArticle.currentVersionNumber,
           versions: mapVersionHistory(updatedArticle.versions),
+          creatorId: updatedArticle.creatorId,
         },
       });
     } catch (error) {
@@ -473,13 +562,27 @@ function registerBaseRoutes(router) {
     try {
       const { id } = req.params;
 
-      const article = await Article.findByPk(id);
+      const article = await Article.findByPk(id, {
+        attributes: ['id', 'currentVersionNumber', 'createdAt', 'updatedAt', 'creatorId', 'workspaceId'],
+      });
 
       if (!article) {
         return res.status(404).json({
           success: false,
           error: 'Article not found',
           status: 404,
+        });
+      }
+
+
+      const isCreator = article.creatorId === req.userId;
+      const isAdmin = req.user?.role === 'admin';
+
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({
+          success: false,
+          error: 'You do not have permission to delete this article. Only the creator or an admin can delete articles.',
+          status: 403,
         });
       }
 

@@ -11,7 +11,7 @@ function CommentSection({
   onDeleteComment,
   disabled,
 }) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [newComment, setNewComment] = useState({ content: '' });
   const [formError, setFormError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -164,16 +164,18 @@ function CommentSection({
                   </span>
                 </div>
                 <p className="comment-item-body">{comment.content}</p>
-                {comment.userId === user?.id && (
+                {(comment.userId === user?.id || isAdmin) && (
                   <div className="comment-actions">
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => beginEdit(comment)}
-                      disabled={disabled}
-                    >
-                      Edit
-                    </button>
+                    {comment.userId === user?.id && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => beginEdit(comment)}
+                        disabled={disabled}
+                      >
+                        Edit
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="btn btn-danger"

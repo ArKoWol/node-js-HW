@@ -169,7 +169,10 @@ function registerCommentRoutes(router) {
         });
       }
 
-      if (comment.userId !== req.user.id) {
+      const isOwner = comment.userId === req.user.id;
+      const isAdmin = req.user?.role === 'admin';
+
+      if (!isOwner && !isAdmin) {
         return res.status(403).json({
           success: false,
           error: 'You can only delete your own comments',

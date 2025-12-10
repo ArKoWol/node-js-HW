@@ -4,17 +4,17 @@ import ArticleList from './components/ArticleList';
 import ArticleView from './components/ArticleView';
 import ArticleEditor from './components/ArticleEditor';
 import NotificationDisplay from './components/NotificationDisplay';
-import ConfirmDialog from './components/ConfirmDialog';
 import { useWebSocket } from './hooks/useWebSocket';
 import WorkspaceSwitcher from './components/WorkspaceSwitcher';
 import { useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import Register from './components/Register';
+import UserManagement from './components/UserManagement';
 
 const API_URL = 'http://localhost:3000/api';
 
 function App() {
-  const { isAuthenticated, loading: authLoading, getAuthHeaders, logout } = useAuth();
+  const { isAuthenticated, loading: authLoading, getAuthHeaders, logout, isAdmin } = useAuth();
   const [authView, setAuthView] = useState('login'); // 'login' or 'register'
   const [view, setView] = useState('list');
   const [articles, setArticles] = useState([]);
@@ -29,7 +29,7 @@ function App() {
   const [viewingVersion, setViewingVersion] = useState(null);
   const [versionLoading, setVersionLoading] = useState(false);
   const [selectedVersionNumber, setSelectedVersionNumber] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, articleId: null });
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null);
 
   const resetVersionState = () => {
     setViewingVersion(null);
@@ -244,16 +244,21 @@ function App() {
     }
   };
 
-  const handleDeleteArticle = (articleId) => {
-    setDeleteConfirm({ isOpen: true, articleId });
+  const handleDeleteArticle = async (articleId) => {
+    setDeleteConfirmation({
+      articleId,
+      show: true
+    });
   };
 
-  const confirmDeleteArticle = async () => {
-    const { articleId } = deleteConfirm;
-    setDeleteConfirm({ isOpen: false, articleId: null });
-
+  const confirmDelete = async () => {
+    if (!deleteConfirmation) return;
+    
+    const articleId = deleteConfirmation.articleId;
+    setDeleteConfirmation(null);
     setLoading(true);
     setError(null);
+    
     try {
       const response = await fetch(`${API_URL}/articles/${articleId}`, {
         method: 'DELETE',
@@ -284,8 +289,8 @@ function App() {
     }
   };
 
-  const cancelDeleteArticle = () => {
-    setDeleteConfirm({ isOpen: false, articleId: null });
+  const cancelDelete = () => {
+    setDeleteConfirmation(null);
   };
 
   const handleBackToList = () => {
@@ -356,11 +361,6 @@ function App() {
         logout();
         return { success: false, error: 'Authentication required' };
       }
-
-      if (response.status === 403) {
-        const data = await response.json();
-        return { success: false, error: data.error || 'You can only edit your own comments' };
-      }
       
       const data = await response.json();
       if (!response.ok) {
@@ -392,11 +392,6 @@ function App() {
       if (response.status === 401) {
         logout();
         return { success: false, error: 'Authentication required' };
-      }
-
-      if (response.status === 403) {
-        const data = await response.json();
-        return { success: false, error: data.error || 'You can only delete your own comments' };
       }
       
       const data = await response.json();
@@ -499,10 +494,20 @@ function App() {
             <div style={{ color: 'white', marginRight: '1rem' }}>
               {user?.email}
             </div>
+            {isAdmin && view !== 'users' && (
+              <button className="btn btn-secondary" onClick={() => setView('users')}>
+                User Management
+              </button>
+            )}
             <button className="btn btn-secondary" onClick={logout}>
               Logout
             </button>
-            {view !== 'list' && (
+            {view !== 'list' && view !== 'users' && (
+              <button className="btn btn-secondary" onClick={handleBackToList}>
+                ← Back to List
+              </button>
+            )}
+            {view === 'users' && (
               <button className="btn btn-secondary" onClick={handleBackToList}>
                 ← Back to List
               </button>
@@ -529,6 +534,23 @@ function App() {
           <div className="error-banner">
             <span>{error}</span>
             <button onClick={() => setError(null)}>✕</button>
+          </div>
+        )}
+
+        {deleteConfirmation?.show && (
+          <div className="delete-confirmation-overlay">
+            <div className="delete-confirmation-dialog">
+              <h3>Delete Article</h3>
+              <p>Are you sure you want to delete this article? This action cannot be undone.</p>
+              <div className="delete-confirmation-actions">
+                <button className="btn btn-danger" onClick={confirmDelete}>
+                  Delete
+                </button>
+                <button className="btn btn-secondary" onClick={cancelDelete}>
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -583,6 +605,10 @@ function App() {
             defaultWorkspaceId={activeWorkspaceId}
           />
         )}
+
+        {view === 'users' && isAdmin && (
+          <UserManagement />
+        )}
       </main>
 
       <footer className="app-footer">
@@ -598,16 +624,6 @@ function App() {
           />
         ))}
       </div>
-
-      <ConfirmDialog
-        isOpen={deleteConfirm.isOpen}
-        title="Delete Article"
-        message="Are you sure you want to delete this article? This action cannot be undone."
-        confirmText="Delete"
-        cancelText="Cancel"
-        onConfirm={confirmDeleteArticle}
-        onCancel={cancelDeleteArticle}
-      />
     </div>
   );
 }

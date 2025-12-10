@@ -17,7 +17,21 @@ function ArticleView({
   onUpdateComment,
   onDeleteComment,
 }) {
-  const { getAuthHeaders } = useAuth();
+  const { getAuthHeaders, user, isAdmin } = useAuth();
+  
+  const userIsAdmin = isAdmin === true;
+  const userIsCreator = Boolean(
+    article && 
+    user && 
+    article.creatorId && 
+    article.creatorId === user.id
+  );
+  
+  const canEdit = Boolean(article && user && (userIsAdmin || userIsCreator));
+  
+  const canDelete = Boolean(article && user && (userIsAdmin || userIsCreator));
+  
+  const showActions = canEdit || canDelete;
   if (loading) {
     return (
       <div className="loading-container">
@@ -56,7 +70,7 @@ function ArticleView({
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
-    window.open(url, '_blank');
+        window.open(url, '_blank');
         // Clean up the object URL after a delay
         setTimeout(() => window.URL.revokeObjectURL(url), 100);
       } else {
@@ -197,22 +211,28 @@ function ArticleView({
           className="article-body"
           dangerouslySetInnerHTML={{ __html: displayArticle.content }}
         />
-        <div className="article-actions">
-          <button
-            className="btn btn-primary"
-            onClick={onEdit}
-            disabled={loading || isViewingOldVersion}
-          >
-            Edit Article
-          </button>
-          <button
-            className="btn btn-danger"
-            onClick={() => onDelete(article.id)}
-            disabled={loading}
-          >
-            Delete Article
-          </button>
-        </div>
+        {showActions && (
+          <div className="article-actions">
+            {canEdit && (
+              <button
+                className="btn btn-primary"
+                onClick={onEdit}
+                disabled={loading || isViewingOldVersion}
+              >
+                Edit Article
+              </button>
+            )}
+            {canDelete && (
+              <button
+                className="btn btn-danger"
+                onClick={() => onDelete(article.id)}
+                disabled={loading}
+              >
+                Delete Article
+              </button>
+            )}
+          </div>
+        )}
         {isViewingOldVersion && (
           <p className="read-only-hint">
             Old versions are read-only. Switch back to the latest version to edit.
@@ -238,6 +258,7 @@ ArticleView.propTypes = {
     author: PropTypes.string.isRequired,
     createdAt: PropTypes.string.isRequired,
     updatedAt: PropTypes.string,
+    creatorId: PropTypes.string,
     currentVersionNumber: PropTypes.number,
     versions: PropTypes.arrayOf(
       PropTypes.shape({

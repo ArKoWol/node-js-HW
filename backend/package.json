@@ -11,7 +11,10 @@
     "db:migrate:undo": "npx sequelize-cli db:migrate:undo",
     "db:migrate:status": "npx sequelize-cli db:migrate:status",
     "db:migrate-data": "node migrate-data-from-files.js",
-    "db:seed:all": "npx sequelize-cli db:seed:all"
+    "db:seed:all": "npx sequelize-cli db:seed:all",
+    "assign-admin": "node scripts/assign-admin.js",
+    "check-creator-ids": "node scripts/check-creator-ids.js",
+    "backfill-creator-ids": "node scripts/backfill-creator-ids.js"
   },
   "keywords": [
     "articles",

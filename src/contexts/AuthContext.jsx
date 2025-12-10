@@ -161,6 +161,10 @@ export function AuthProvider({ children }) {
     return !!token && !!user;
   };
 
+  const isAdmin = () => {
+    return user?.role === 'admin';
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -171,7 +175,8 @@ export function AuthProvider({ children }) {
         register,
         logout,
         getAuthHeaders,
-        isAuthenticated: isAuthenticated()
+        isAuthenticated: isAuthenticated(),
+        isAdmin: isAdmin()
       }}
     >
       {children}

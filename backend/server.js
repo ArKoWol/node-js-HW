@@ -7,6 +7,7 @@ import http from 'http';
 import articlesRouter from './routes/articles.js';
 import workspacesRouter from './routes/workspaces.js';
 import authRouter from './routes/auth.js';
+import usersRouter from './routes/users.js';
 import { testConnection } from './models/index.js';
 import { initializeWebSocket } from './utils/websocket.js';
 import { verifyToken } from './middleware/auth.js';
@@ -39,6 +40,7 @@ app.use('/api/auth', authRouter);
 // Protected routes - require JWT authentication
 app.use('/api/articles', verifyToken, articlesRouter);
 app.use('/api/workspaces', verifyToken, workspacesRouter);
+app.use('/api/users', usersRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });

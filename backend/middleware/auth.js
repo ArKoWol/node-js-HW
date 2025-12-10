@@ -32,21 +32,17 @@ export const verifyToken = async (req, res, next) => {
 
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
-      req.userId = decoded.userId;
-      
       const user = await User.findByPk(decoded.userId);
+      
       if (!user) {
         return res.status(401).json({ 
           error: 'User not found',
           status: 401 
         });
       }
-      
-      req.user = {
-        id: user.id,
-        email: user.email
-      };
-      
+
+      req.userId = decoded.userId;
+      req.user = user;
       next();
     } catch (err) {
       if (err.name === 'TokenExpiredError') {
@@ -70,6 +66,24 @@ export const verifyToken = async (req, res, next) => {
       status: 500 
     });
   }
+};
+
+export const requireAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      error: 'Authentication required',
+      status: 401
+    });
+  }
+
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({
+      error: 'Admin access required',
+      status: 403
+    });
+  }
+
+  next();
 };
 
 
