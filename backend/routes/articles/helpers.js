@@ -12,6 +12,7 @@ export const formatComment = (comment) => ({
   id: comment.id,
   author: comment.author,
   content: comment.content,
+  userId: comment.userId,
   createdAt: comment.createdAt,
   updatedAt: comment.updatedAt,
 });

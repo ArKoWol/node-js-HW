@@ -49,16 +49,19 @@ cd ..
    DB_USER=postgres
    DB_PASSWORD=your_password
    PORT=3000
+   JWT_SECRET=your-secret-key-change-in-production
+   JWT_EXPIRES_IN=24h
    ```
+   > **Note:** `JWT_SECRET` should be a strong, random string in production. `JWT_EXPIRES_IN` defaults to 24h if not specified.
 
-4. Run migrations:
+4. Run migrations and seeders:
    ```bash
    cd backend
    npm run db:migrate
    npm run db:seed:all
    cd ..
    ```
-   > Tip: The version history feature relies on the new `article_versions` table, so rerun `npm run db:migrate` after pulling these changes.
+   > **Note:** The version history feature relies on the `article_versions` table. After running migrations, all existing articles will have version 1 created automatically.
 
 ## Running the Application
 
@@ -106,7 +109,16 @@ npm run dev
 
 ## API Endpoints
 
-### Articles
+### Authentication (Public)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/register` | Register a new user (email + password) |
+| POST | `/api/auth/login` | Login with email + password, returns JWT token |
+| GET | `/api/auth/verify` | Verify JWT token validity |
+
+**Note:** All endpoints below require authentication via JWT token in the `Authorization` header: `Bearer <token>`
+
+### Articles (Protected)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/articles?workspaceId=<id>` | List articles (optionally filter by workspace) |
@@ -137,7 +149,7 @@ npm run dev
 | PUT | `/api/articles/:id/comments/:commentId` | Update a comment |
 | DELETE | `/api/articles/:id/comments/:commentId` | Delete a comment |
 
-### Workspaces
+### Workspaces (Protected)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/workspaces` | List workspaces with article counts |
@@ -163,6 +175,7 @@ curl -X POST http://localhost:3000/api/articles \
 │   │   └── database.cjs       # Sequelize CLI configuration
 │   ├── models/
 │   │   ├── index.js           # Sequelize connection
+│   │   ├── User.js            # User model with password hashing
 │   │   ├── Article.js         # Article model
 │   │   ├── ArticleVersion.js  # Immutable article snapshots
 │   │   ├── Attachment.js      # Attachment blobs
@@ -170,10 +183,14 @@ curl -X POST http://localhost:3000/api/articles \
 │   │   └── Comment.js         # Article comments
 │   ├── migrations/
 │   │   ├── *-create-articles-table.cjs  # Database migrations
-│   │   └── 6-create-article-versions-table.cjs
+│   │   ├── 6-create-article-versions-table.cjs
+│   │   └── 7-create-users-table.cjs     # User authentication table
+│   ├── middleware/
+│   │   └── auth.js            # JWT authentication middleware
 │   ├── routes/
-│   │   ├── articles.js        # Article + comment routes
-│   │   └── workspaces.js      # Workspace CRUD routes
+│   │   ├── auth.js            # Authentication routes (register, login)
+│   │   ├── articles.js        # Article + comment routes (protected)
+│   │   └── workspaces.js      # Workspace CRUD routes (protected)
 │   ├── utils/
 │   │   ├── fileSystem.js      # File operations for attachments
 │   │   ├── websocket.js       # WebSocket notifications
@@ -181,8 +198,12 @@ curl -X POST http://localhost:3000/api/articles \
 │   └── data/
 │       └── attachments/       # File attachments storage
 ├── src/
-│   ├── App.jsx                # Main app + WebSocket integration
+│   ├── App.jsx                # Main app + WebSocket integration + auth routing
+│   ├── contexts/
+│   │   └── AuthContext.jsx    # Authentication context & JWT management
 │   ├── components/
+│   │   ├── Login.jsx          # Login page
+│   │   ├── Register.jsx       # Registration page
 │   │   ├── ArticleList.jsx
 │   │   ├── ArticleView.jsx    # + attachment display
 │   │   ├── ArticleEditor.jsx  # + file upload UI
@@ -199,6 +220,12 @@ curl -X POST http://localhost:3000/api/articles \
 
 ### Backend
 - RESTful API with Express
+- **🔐 JWT Authentication**
+  - User registration with email + password (bcrypt hashing)
+  - Login endpoint returns signed JWT tokens
+  - Protected routes require valid JWT tokens
+  - Token expiration handling
+  - Secure password storage
 - **PostgreSQL database with Sequelize ORM**
 - Database migrations for easy setup
 - Article versioning (each update becomes a new immutable snapshot)
@@ -213,6 +240,7 @@ curl -X POST http://localhost:3000/api/articles \
   - File type validation
   - 10MB size limit
   - Secure file storage
+  - Attachments are version-specific (each version maintains its own attachments)
 - **🔔 WebSocket real-time notifications**
   - Article creation/update/deletion notifications
   - File attachment notifications
@@ -220,6 +248,13 @@ curl -X POST http://localhost:3000/api/articles \
   - Multi-client broadcast
 
 ### Frontend
+- **🔐 Authentication UI**
+  - Login page with email + password
+  - Registration page with password confirmation
+  - Protected routes redirect to login when token is missing/invalid/expired
+  - JWT token stored securely in localStorage
+  - Automatic token verification on app load
+  - Logout functionality
 - Article list view (card grid)
 - Article detail view
 - Workspace switcher with contextual article filtering

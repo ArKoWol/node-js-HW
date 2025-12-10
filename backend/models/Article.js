@@ -12,34 +12,19 @@ const Article = sequelize.define('Article', {
   },
   title: {
     type: DataTypes.STRING(200),
-    allowNull: false,
-    validate: {
-      notEmpty: {
-        msg: 'Title is required and must be a non-empty string'
-      },
-      len: {
-        args: [1, 200],
-        msg: 'Title must be between 1 and 200 characters'
-      }
-    }
+    allowNull: true,
+    // Title should come from the current version, kept here for backward compatibility
   },
   content: {
     type: DataTypes.TEXT,
-    allowNull: false,
-    validate: {
-      notEmpty: {
-        msg: 'Content is required and must be a non-empty string'
-      },
-      len: {
-        args: [1, 1000000],
-        msg: 'Content must be between 1 and 1,000,000 characters'
-      }
-    }
+    allowNull: true,
+    // Content should come from the current version, kept here for backward compatibility
   },
   author: {
     type: DataTypes.STRING(100),
-    allowNull: false,
-    defaultValue: 'Anonymous'
+    allowNull: true,
+    defaultValue: null,
+    // Author should come from the current version, kept here for backward compatibility
   },
   workspaceId: {
     type: DataTypes.UUID,
