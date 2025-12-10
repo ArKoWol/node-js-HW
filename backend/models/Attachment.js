@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize';
 import sequelize from './index.js';
+import ArticleVersion from './ArticleVersion.js';
 
 const Attachment = sequelize.define('Attachment', {
   id: {
@@ -12,6 +13,11 @@ const Attachment = sequelize.define('Attachment', {
     type: DataTypes.UUID,
     allowNull: false,
     field: 'article_id'
+  },
+  versionId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    field: 'version_id'
   },
   filename: {
     type: DataTypes.STRING(255),
@@ -35,6 +41,17 @@ const Attachment = sequelize.define('Attachment', {
   timestamps: true,
   createdAt: 'created_at',
   updatedAt: false
+});
+
+Attachment.belongsTo(ArticleVersion, {
+  foreignKey: 'versionId',
+  as: 'version'
+});
+
+ArticleVersion.hasMany(Attachment, {
+  foreignKey: 'versionId',
+  as: 'attachments',
+  onDelete: 'CASCADE'
 });
 
 export default Attachment;

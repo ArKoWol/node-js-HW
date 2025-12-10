@@ -25,6 +25,11 @@ const Comment = sequelize.define('Comment', {
     allowNull: false,
     defaultValue: 'Anonymous'
   },
+  userId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    field: 'user_id'
+  },
   content: {
     type: DataTypes.TEXT,
     allowNull: false,

@@ -6,8 +6,11 @@ import cors from 'cors';
 import http from 'http';
 import articlesRouter from './routes/articles.js';
 import workspacesRouter from './routes/workspaces.js';
+import authRouter from './routes/auth.js';
+import usersRouter from './routes/users.js';
 import { testConnection } from './models/index.js';
 import { initializeWebSocket } from './utils/websocket.js';
+import { verifyToken } from './middleware/auth.js';
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
@@ -31,8 +34,13 @@ try {
   process.exit(1);
 }
 
-app.use('/api/articles', articlesRouter);
-app.use('/api/workspaces', workspacesRouter);
+// Public routes
+app.use('/api/auth', authRouter);
+
+// Protected routes - require JWT authentication
+app.use('/api/articles', verifyToken, articlesRouter);
+app.use('/api/workspaces', verifyToken, workspacesRouter);
+app.use('/api/users', usersRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
