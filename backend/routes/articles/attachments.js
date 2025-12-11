@@ -1,6 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import Article from '../../models/Article.js';
+import ArticleVersion from '../../models/ArticleVersion.js';
 import Attachment from '../../models/Attachment.js';
 import {
   notifyFileAttached,
@@ -61,8 +62,25 @@ function registerAttachmentRoutes(router) {
         });
       }
 
+      // Get current version to associate attachment with it
+      const currentVersion = await ArticleVersion.findOne({
+        where: {
+          articleId: id,
+          versionNumber: article.currentVersionNumber,
+        },
+      });
+
+      if (!currentVersion) {
+        return res.status(404).json({
+          success: false,
+          error: 'Current version not found',
+          status: 404,
+        });
+      }
+
       const attachment = await Attachment.create({
         articleId: id,
+        versionId: currentVersion.id,
         filename: req.file.originalname,
         mimeType: req.file.mimetype,
         size: req.file.size,
@@ -70,7 +88,7 @@ function registerAttachmentRoutes(router) {
       });
 
       notifyFileAttached(
-        { id: article.id, title: article.title },
+        { id: article.id, title: currentVersion.title },
         { id: attachment.id, filename: attachment.filename },
       );
 
@@ -116,9 +134,26 @@ function registerAttachmentRoutes(router) {
       const article = await Article.findByPk(id);
       const filename = attachment.filename;
 
+      // Get version title for notification
+      let articleTitle = 'Article';
+      if (attachment.versionId) {
+        const version = await ArticleVersion.findByPk(attachment.versionId);
+        if (version) {
+          articleTitle = version.title;
+        }
+      } else if (article) {
+        const currentVersion = await ArticleVersion.findOne({
+          where: {
+            articleId: id,
+            versionNumber: article.currentVersionNumber,
+          },
+        });
+        articleTitle = currentVersion?.title || 'Article';
+      }
+
       await attachment.destroy();
 
-      notifyFileDeleted(id, article?.title || 'Article', filename);
+      notifyFileDeleted(id, articleTitle, filename);
 
       res.json({
         success: true,
