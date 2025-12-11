@@ -13,6 +13,7 @@ function ArticleView({
   onVersionReset,
   onEdit,
   onDelete,
+  onExportPDF,
   onAddComment,
   onUpdateComment,
   onDeleteComment,
@@ -211,28 +212,39 @@ function ArticleView({
           className="article-body"
           dangerouslySetInnerHTML={{ __html: displayArticle.content }}
         />
-        {showActions && (
-          <div className="article-actions">
-            {canEdit && (
-              <button
-                className="btn btn-primary"
-                onClick={onEdit}
-                disabled={loading || isViewingOldVersion}
-              >
-                Edit Article
-              </button>
-            )}
-            {canDelete && (
-              <button
-                className="btn btn-danger"
-                onClick={() => onDelete(article.id)}
-                disabled={loading}
-              >
-                Delete Article
-              </button>
-            )}
-          </div>
-        )}
+        <div className="article-actions">
+          {onExportPDF && (
+            <button
+              className="btn btn-export"
+              onClick={onExportPDF}
+              disabled={loading}
+            >
+               Export as PDF
+            </button>
+          )}
+          {showActions && (
+            <>
+              {canEdit && (
+                <button
+                  className="btn btn-primary"
+                  onClick={onEdit}
+                  disabled={loading || isViewingOldVersion}
+                >
+                  Edit Article
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  className="btn btn-danger"
+                  onClick={() => onDelete(article.id)}
+                  disabled={loading}
+                >
+                  Delete Article
+                </button>
+              )}
+            </>
+          )}
+        </div>
         {isViewingOldVersion && (
           <p className="read-only-hint">
             Old versions are read-only. Switch back to the latest version to edit.
@@ -297,6 +309,7 @@ ArticleView.propTypes = {
   onVersionReset: PropTypes.func.isRequired,
   onEdit: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
+  onExportPDF: PropTypes.func,
   onAddComment: PropTypes.func.isRequired,
   onUpdateComment: PropTypes.func.isRequired,
   onDeleteComment: PropTypes.func.isRequired,
