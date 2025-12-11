@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import ArticleList from './components/ArticleList';
 import ArticleView from './components/ArticleView';
@@ -30,6 +30,8 @@ function App() {
   const [versionLoading, setVersionLoading] = useState(false);
   const [selectedVersionNumber, setSelectedVersionNumber] = useState(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const lastFetchedSearchRef = useRef('');
 
   const resetVersionState = () => {
     setViewingVersion(null);
@@ -68,14 +70,19 @@ function App() {
     }
   }, [isAuthenticated, getAuthHeaders, logout]);
 
-  const fetchArticles = useCallback(async (workspaceId) => {
+  const fetchArticles = useCallback(async (workspaceId, search = '') => {
     if (!workspaceId || !isAuthenticated) {
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/articles?workspaceId=${workspaceId}`, {
+      let url = `${API_URL}/articles?workspaceId=${workspaceId}`;
+      if (search && search.trim().length > 0) {
+        url += `&search=${encodeURIComponent(search.trim())}`;
+      }
+      
+      const response = await fetch(url, {
         headers: getAuthHeaders()
       });
       
@@ -97,6 +104,12 @@ function App() {
     }
   }, [isAuthenticated, getAuthHeaders, logout]);
 
+  // Use ref to store fetchArticles to avoid dependency issues
+  const fetchArticlesRef = useRef(fetchArticles);
+  useEffect(() => {
+    fetchArticlesRef.current = fetchArticles;
+  }, [fetchArticles]);
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchWorkspaces();
@@ -105,10 +118,13 @@ function App() {
 
   useEffect(() => {
     if (isAuthenticated && activeWorkspaceId) {
-      setArticles([]);
-      fetchArticles(activeWorkspaceId);
+      const workspaceKey = `${activeWorkspaceId}-${searchQuery || ''}`;
+      if (lastFetchedSearchRef.current !== workspaceKey) {
+        lastFetchedSearchRef.current = workspaceKey;
+        fetchArticlesRef.current(activeWorkspaceId, searchQuery || '');
+      }
     }
-  }, [isAuthenticated, activeWorkspaceId, fetchArticles]);
+  }, [isAuthenticated, activeWorkspaceId, searchQuery]);
 
   const handleWebSocketMessage = (data) => {
     const notification = {
@@ -120,8 +136,13 @@ function App() {
     
     setNotifications((prev) => [notification, ...prev].slice(0, 5));
 
-    if (data.type !== 'connection' && view === 'list') {
-      fetchArticles(activeWorkspaceId);
+    if (data.type !== 'connection' && view === 'list' && activeWorkspaceId) {
+      const currentSearch = searchQuery || '';
+      const workspaceKey = `${activeWorkspaceId}-${currentSearch}`;
+      if (lastFetchedSearchRef.current !== workspaceKey) {
+        lastFetchedSearchRef.current = workspaceKey;
+        fetchArticlesRef.current(activeWorkspaceId, currentSearch);
+      }
       fetchWorkspaces();
     }
     
@@ -524,6 +545,7 @@ function App() {
             setSelectedArticle(null);
             resetVersionState();
             setView('list');
+            setSearchQuery('');
           }}
           onRefresh={fetchWorkspaces}
         />
@@ -562,6 +584,8 @@ function App() {
             activeWorkspace={activeWorkspace}
             onArticleClick={handleArticleClick}
             onCreateNew={handleCreateNew}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
           />
         )}
 

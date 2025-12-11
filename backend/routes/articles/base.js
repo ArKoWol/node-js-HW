@@ -5,6 +5,7 @@ import Workspace from '../../models/Workspace.js';
 import Comment from '../../models/Comment.js';
 import User from '../../models/User.js';
 import sequelize from '../../models/index.js';
+import { Op } from 'sequelize';
 import {
   notifyArticleCreated,
   notifyArticleUpdated,
@@ -20,7 +21,7 @@ const mapVersionHistory = (versions = []) =>
 function registerBaseRoutes(router) {
   router.get('/', async (req, res, next) => {
     try {
-      const { workspaceId } = req.query;
+      const { workspaceId, search } = req.query;
       const workspaceFilter = {};
 
       if (workspaceId) {
@@ -35,8 +36,44 @@ function registerBaseRoutes(router) {
         workspaceFilter.workspaceId = workspaceId;
       }
 
+      const articleWhere = { ...workspaceFilter };
+      
+      if (search && search.trim().length > 0) {
+        const searchTerm = search.trim();
+        
+        const results = await sequelize.query(
+          `
+          SELECT DISTINCT a.id
+          FROM articles a
+          INNER JOIN article_versions av ON a.id = av.article_id 
+            AND av.version_number = a.current_version_number
+          WHERE (av.title ILIKE :searchTerm OR av.content ILIKE :searchTerm)
+            ${workspaceId ? 'AND a.workspace_id = :workspaceId' : ''}
+          `,
+          {
+            replacements: {
+              searchTerm: `%${searchTerm}%`,
+              workspaceId: workspaceId || null,
+            },
+            type: sequelize.QueryTypes.SELECT,
+          }
+        );
+
+        const matchingArticleIds = results.map((r) => r.id);
+        
+        if (matchingArticleIds.length === 0) {
+          return res.json({
+            success: true,
+            count: 0,
+            articles: [],
+          });
+        }
+        
+        articleWhere.id = { [Op.in]: matchingArticleIds };
+      }
+
       const articles = await Article.findAll({
-        where: workspaceFilter,
+        where: articleWhere,
         attributes: ['id', 'currentVersionNumber', 'createdAt', 'creatorId'],
         order: [['createdAt', 'DESC']],
         include: [
