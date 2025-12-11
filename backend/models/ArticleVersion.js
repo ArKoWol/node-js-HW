@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize';
 import sequelize from './index.js';
+import Attachment from './Attachment.js';
 
 const ArticleVersion = sequelize.define('ArticleVersion', {
   id: {

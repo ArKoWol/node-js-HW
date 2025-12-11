@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import './ArticleView.css';
 import CommentSection from './CommentSection';
+import { useAuth } from '../contexts/AuthContext';
 
 function ArticleView({
   article,
@@ -12,10 +13,26 @@ function ArticleView({
   onVersionReset,
   onEdit,
   onDelete,
+  onExportPDF,
   onAddComment,
   onUpdateComment,
   onDeleteComment,
 }) {
+  const { getAuthHeaders, user, isAdmin } = useAuth();
+  
+  const userIsAdmin = isAdmin === true;
+  const userIsCreator = Boolean(
+    article && 
+    user && 
+    article.creatorId && 
+    article.creatorId === user.id
+  );
+  
+  const canEdit = Boolean(article && user && (userIsAdmin || userIsCreator));
+  
+  const canDelete = Boolean(article && user && (userIsAdmin || userIsCreator));
+  
+  const showActions = canEdit || canDelete;
   if (loading) {
     return (
       <div className="loading-container">
@@ -44,10 +61,26 @@ function ArticleView({
   );
   const versionOptions = article.versions || [];
 
-  const handleAttachmentClick = (attachment) => {
+  const handleAttachmentClick = async (attachment) => {
     const API_URL = 'http://localhost:3000/api';
-    const url = `${API_URL}/articles/${article.id}/attachments/${attachment.id}`;
-    window.open(url, '_blank');
+    try {
+      const response = await fetch(`${API_URL}/articles/${article.id}/attachments/${attachment.id}`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        // Clean up the object URL after a delay
+        setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      } else {
+        alert('Failed to load attachment. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error loading attachment:', error);
+      alert('Failed to load attachment. Please try again.');
+    }
   };
 
   const getAttachmentIcon = (mimeType) => {
@@ -180,20 +213,37 @@ function ArticleView({
           dangerouslySetInnerHTML={{ __html: displayArticle.content }}
         />
         <div className="article-actions">
-          <button
-            className="btn btn-primary"
-            onClick={onEdit}
-            disabled={loading || isViewingOldVersion}
-          >
-            Edit Article
-          </button>
-          <button
-            className="btn btn-danger"
-            onClick={() => onDelete(article.id)}
-            disabled={loading}
-          >
-            Delete Article
-          </button>
+          {onExportPDF && (
+            <button
+              className="btn btn-export"
+              onClick={onExportPDF}
+              disabled={loading}
+            >
+               Export as PDF
+            </button>
+          )}
+          {showActions && (
+            <>
+              {canEdit && (
+                <button
+                  className="btn btn-primary"
+                  onClick={onEdit}
+                  disabled={loading || isViewingOldVersion}
+                >
+                  Edit Article
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  className="btn btn-danger"
+                  onClick={() => onDelete(article.id)}
+                  disabled={loading}
+                >
+                  Delete Article
+                </button>
+              )}
+            </>
+          )}
         </div>
         {isViewingOldVersion && (
           <p className="read-only-hint">
@@ -220,6 +270,7 @@ ArticleView.propTypes = {
     author: PropTypes.string.isRequired,
     createdAt: PropTypes.string.isRequired,
     updatedAt: PropTypes.string,
+    creatorId: PropTypes.string,
     currentVersionNumber: PropTypes.number,
     versions: PropTypes.arrayOf(
       PropTypes.shape({
@@ -258,6 +309,7 @@ ArticleView.propTypes = {
   onVersionReset: PropTypes.func.isRequired,
   onEdit: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
+  onExportPDF: PropTypes.func,
   onAddComment: PropTypes.func.isRequired,
   onUpdateComment: PropTypes.func.isRequired,
   onDeleteComment: PropTypes.func.isRequired,
