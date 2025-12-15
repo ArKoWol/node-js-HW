@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import './CommentSection.css';
+import { useAuth } from '../contexts/AuthContext';
+import ConfirmDialog from './ConfirmDialog';
 
 function CommentSection({
   comments,
@@ -9,13 +11,15 @@ function CommentSection({
   onDeleteComment,
   disabled,
 }) {
-  const [newComment, setNewComment] = useState({ author: '', content: '' });
+  const { user, isAdmin } = useAuth();
+  const [newComment, setNewComment] = useState({ content: '' });
   const [formError, setFormError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [editDraft, setEditDraft] = useState({ author: '', content: '' });
+  const [editDraft, setEditDraft] = useState({ content: '' });
   const [actionError, setActionError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, commentId: null });
 
   const handleNewCommentSubmit = async (event) => {
     event.preventDefault();
@@ -28,7 +32,6 @@ function CommentSection({
 
     setSubmitting(true);
     const result = await onAddComment({
-      author: newComment.author.trim(),
       content: newComment.content.trim(),
     });
     setSubmitting(false);
@@ -38,18 +41,18 @@ function CommentSection({
       return;
     }
 
-    setNewComment({ author: '', content: '' });
+    setNewComment({ content: '' });
   };
 
   const beginEdit = (comment) => {
     setEditingId(comment.id);
-    setEditDraft({ author: comment.author, content: comment.content });
+    setEditDraft({ content: comment.content });
     setActionError(null);
   };
 
   const resetEditState = () => {
     setEditingId(null);
-    setEditDraft({ author: '', content: '' });
+    setEditDraft({ content: '' });
   };
 
   const saveEdit = async () => {
@@ -60,7 +63,6 @@ function CommentSection({
     }
     setSubmitting(true);
     const result = await onUpdateComment(editingId, {
-      author: editDraft.author.trim(),
       content: editDraft.content.trim(),
     });
     setSubmitting(false);
@@ -71,17 +73,24 @@ function CommentSection({
     resetEditState();
   };
 
-  const deleteComment = async (commentId) => {
+  const deleteComment = (commentId) => {
+    setDeleteConfirm({ isOpen: true, commentId });
+  };
+
+  const confirmDeleteComment = async () => {
+    const { commentId } = deleteConfirm;
+    setDeleteConfirm({ isOpen: false, commentId: null });
     setActionError(null);
-    if (!window.confirm('Delete this comment?')) {
-      return;
-    }
     setDeletingId(commentId);
     const result = await onDeleteComment(commentId);
     setDeletingId(null);
     if (!result.success) {
       setActionError(result.error || 'Unable to delete comment');
     }
+  };
+
+  const cancelDeleteComment = () => {
+    setDeleteConfirm({ isOpen: false, commentId: null });
   };
 
   return (
@@ -113,15 +122,6 @@ function CommentSection({
           <div key={comment.id} className="comment-item">
             {editingId === comment.id ? (
               <div className="comment-edit-form">
-                <input
-                  type="text"
-                  placeholder="Author"
-                  value={editDraft.author}
-                  onChange={(event) =>
-                    setEditDraft({ ...editDraft, author: event.target.value })
-                  }
-                  disabled={submitting || disabled}
-                />
                 <textarea
                   rows="3"
                   value={editDraft.content}
@@ -164,24 +164,28 @@ function CommentSection({
                   </span>
                 </div>
                 <p className="comment-item-body">{comment.content}</p>
-                <div className="comment-actions">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => beginEdit(comment)}
-                    disabled={disabled}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-danger"
-                    onClick={() => deleteComment(comment.id)}
-                    disabled={disabled || deletingId === comment.id}
-                  >
-                    {deletingId === comment.id ? 'Deleting…' : 'Delete'}
-                  </button>
-                </div>
+                {(comment.userId === user?.id || isAdmin) && (
+                  <div className="comment-actions">
+                    {comment.userId === user?.id && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => beginEdit(comment)}
+                        disabled={disabled}
+                      >
+                        Edit
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      onClick={() => deleteComment(comment.id)}
+                      disabled={disabled || deletingId === comment.id}
+                    >
+                      {deletingId === comment.id ? 'Deleting…' : 'Delete'}
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -191,15 +195,6 @@ function CommentSection({
       <form className="new-comment-form" onSubmit={handleNewCommentSubmit}>
         <h4>Add a comment</h4>
         <div className="form-row">
-          <input
-            type="text"
-            placeholder="Name (optional)"
-            value={newComment.author}
-            onChange={(event) =>
-              setNewComment({ ...newComment, author: event.target.value })
-            }
-            disabled={submitting || disabled}
-          />
           <textarea
             rows="3"
             placeholder="Share your thoughts..."
@@ -219,6 +214,16 @@ function CommentSection({
           {submitting ? 'Posting…' : 'Post Comment'}
         </button>
       </form>
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Comment"
+        message="Are you sure you want to delete this comment?"
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDeleteComment}
+        onCancel={cancelDeleteComment}
+      />
     </section>
   );
 }
@@ -229,6 +234,7 @@ CommentSection.propTypes = {
       id: PropTypes.string.isRequired,
       author: PropTypes.string.isRequired,
       content: PropTypes.string.isRequired,
+      userId: PropTypes.string,
       createdAt: PropTypes.string.isRequired,
     })
   ).isRequired,

@@ -6,10 +6,16 @@ import ArticleEditor from './components/ArticleEditor';
 import NotificationDisplay from './components/NotificationDisplay';
 import { useWebSocket } from './hooks/useWebSocket';
 import WorkspaceSwitcher from './components/WorkspaceSwitcher';
+import { useAuth } from './contexts/AuthContext';
+import Login from './components/Login';
+import Register from './components/Register';
+import UserManagement from './components/UserManagement';
 
 const API_URL = 'http://localhost:3000/api';
 
 function App() {
+  const { isAuthenticated, loading: authLoading, getAuthHeaders, logout, isAdmin } = useAuth();
+  const [authView, setAuthView] = useState('login'); // 'login' or 'register'
   const [view, setView] = useState('list');
   const [articles, setArticles] = useState([]);
   const [selectedArticle, setSelectedArticle] = useState(null);
@@ -23,6 +29,7 @@ function App() {
   const [viewingVersion, setViewingVersion] = useState(null);
   const [versionLoading, setVersionLoading] = useState(false);
   const [selectedVersionNumber, setSelectedVersionNumber] = useState(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null);
 
   const resetVersionState = () => {
     setViewingVersion(null);
@@ -31,10 +38,20 @@ function App() {
   };
 
   const fetchWorkspaces = useCallback(async () => {
+    if (!isAuthenticated) return;
+    
     setWorkspacesLoading(true);
     setWorkspacesError(null);
     try {
-      const response = await fetch(`${API_URL}/workspaces`);
+      const response = await fetch(`${API_URL}/workspaces`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.status === 401) {
+        logout();
+        return;
+      }
+      
       if (!response.ok) {
         throw new Error('Failed to fetch workspaces');
       }
@@ -49,16 +66,24 @@ function App() {
     } finally {
       setWorkspacesLoading(false);
     }
-  }, []);
+  }, [isAuthenticated, getAuthHeaders, logout]);
 
   const fetchArticles = useCallback(async (workspaceId) => {
-    if (!workspaceId) {
+    if (!workspaceId || !isAuthenticated) {
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/articles?workspaceId=${workspaceId}`);
+      const response = await fetch(`${API_URL}/articles?workspaceId=${workspaceId}`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.status === 401) {
+        logout();
+        return;
+      }
+      
       if (!response.ok) {
         throw new Error('Failed to fetch articles');
       }
@@ -70,18 +95,20 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated, getAuthHeaders, logout]);
 
   useEffect(() => {
-    fetchWorkspaces();
-  }, [fetchWorkspaces]);
+    if (isAuthenticated) {
+      fetchWorkspaces();
+    }
+  }, [isAuthenticated, fetchWorkspaces]);
 
   useEffect(() => {
-    if (activeWorkspaceId) {
+    if (isAuthenticated && activeWorkspaceId) {
       setArticles([]);
       fetchArticles(activeWorkspaceId);
     }
-  }, [activeWorkspaceId, fetchArticles]);
+  }, [isAuthenticated, activeWorkspaceId, fetchArticles]);
 
   const handleWebSocketMessage = (data) => {
     const notification = {
@@ -114,7 +141,15 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/articles/${articleId}`);
+      const response = await fetch(`${API_URL}/articles/${articleId}`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.status === 401) {
+        logout();
+        return;
+      }
+      
       if (!response.ok) {
         throw new Error('Failed to fetch article');
       }
@@ -139,9 +174,15 @@ function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders()
         },
         body: JSON.stringify({ ...articleData, workspaceId }),
       });
+
+      if (response.status === 401) {
+        logout();
+        return { success: false, error: 'Authentication required' };
+      }
 
       const data = await response.json();
 
@@ -172,9 +213,15 @@ function App() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders()
         },
         body: JSON.stringify({ ...articleData, workspaceId }),
       });
+
+      if (response.status === 401) {
+        logout();
+        return { success: false, error: 'Authentication required' };
+      }
 
       const data = await response.json();
       
@@ -198,16 +245,30 @@ function App() {
   };
 
   const handleDeleteArticle = async (articleId) => {
-    if (!window.confirm('Are you sure you want to delete this article? This action cannot be undone.')) {
-      return;
-    }
+    setDeleteConfirmation({
+      articleId,
+      show: true
+    });
+  };
 
+  const confirmDelete = async () => {
+    if (!deleteConfirmation) return;
+    
+    const articleId = deleteConfirmation.articleId;
+    setDeleteConfirmation(null);
     setLoading(true);
     setError(null);
+    
     try {
       const response = await fetch(`${API_URL}/articles/${articleId}`, {
         method: 'DELETE',
+        headers: getAuthHeaders()
       });
+
+      if (response.status === 401) {
+        logout();
+        return;
+      }
 
       const data = await response.json();
       
@@ -226,6 +287,10 @@ function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmation(null);
   };
 
   const handleBackToList = () => {
@@ -252,10 +317,17 @@ function App() {
       const response = await fetch(`${API_URL}/articles/${articleId}/comments`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
         },
         body: JSON.stringify(commentData)
       });
+      
+      if (response.status === 401) {
+        logout();
+        return { success: false, error: 'Authentication required' };
+      }
+      
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.errors ? data.errors.join(', ') : data.error || 'Failed to add comment');
@@ -279,10 +351,17 @@ function App() {
       const response = await fetch(`${API_URL}/articles/${articleId}/comments/${commentId}`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
         },
         body: JSON.stringify(commentData)
       });
+      
+      if (response.status === 401) {
+        logout();
+        return { success: false, error: 'Authentication required' };
+      }
+      
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.errors ? data.errors.join(', ') : data.error || 'Failed to update comment');
@@ -306,8 +385,15 @@ function App() {
   const handleDeleteComment = async (articleId, commentId) => {
     try {
       const response = await fetch(`${API_URL}/articles/${articleId}/comments/${commentId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders()
       });
+      
+      if (response.status === 401) {
+        logout();
+        return { success: false, error: 'Authentication required' };
+      }
+      
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error || 'Failed to delete comment');
@@ -340,7 +426,15 @@ function App() {
     setVersionLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/articles/${selectedArticle.id}/versions/${versionNumber}`);
+      const response = await fetch(`${API_URL}/articles/${selectedArticle.id}/versions/${versionNumber}`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.status === 401) {
+        logout();
+        return;
+      }
+      
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error || 'Failed to load version');
@@ -360,6 +454,32 @@ function App() {
   };
 
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) || null;
+  const { user } = useAuth();
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="app">
+        <div className="loading-container">
+          <div className="spinner"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login/register pages if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <>
+        {authView === 'login' ? (
+          <Login onSwitchToRegister={() => setAuthView('register')} />
+        ) : (
+          <Register onSwitchToLogin={() => setAuthView('login')} />
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="app">
@@ -371,7 +491,23 @@ function App() {
               <span className="status-indicator"></span>
               {isConnected ? 'Live' : 'Offline'}
             </div>
-            {view !== 'list' && (
+            <div style={{ color: 'white', marginRight: '1rem' }}>
+              {user?.email}
+            </div>
+            {isAdmin && view !== 'users' && (
+              <button className="btn btn-secondary" onClick={() => setView('users')}>
+                User Management
+              </button>
+            )}
+            <button className="btn btn-secondary" onClick={logout}>
+              Logout
+            </button>
+            {view !== 'list' && view !== 'users' && (
+              <button className="btn btn-secondary" onClick={handleBackToList}>
+                ← Back to List
+              </button>
+            )}
+            {view === 'users' && (
               <button className="btn btn-secondary" onClick={handleBackToList}>
                 ← Back to List
               </button>
@@ -398,6 +534,23 @@ function App() {
           <div className="error-banner">
             <span>{error}</span>
             <button onClick={() => setError(null)}>✕</button>
+          </div>
+        )}
+
+        {deleteConfirmation?.show && (
+          <div className="delete-confirmation-overlay">
+            <div className="delete-confirmation-dialog">
+              <h3>Delete Article</h3>
+              <p>Are you sure you want to delete this article? This action cannot be undone.</p>
+              <div className="delete-confirmation-actions">
+                <button className="btn btn-danger" onClick={confirmDelete}>
+                  Delete
+                </button>
+                <button className="btn btn-secondary" onClick={cancelDelete}>
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -451,6 +604,10 @@ function App() {
             workspaces={workspaces}
             defaultWorkspaceId={activeWorkspaceId}
           />
+        )}
+
+        {view === 'users' && isAdmin && (
+          <UserManagement />
         )}
       </main>
 

@@ -37,7 +37,10 @@ function registerCommentRoutes(router) {
   commentRouter.post('/', async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { author, content } = req.body;
+      const { content } = req.body;
+      // Author is automatically set from logged-in user's email
+      // req.user is guaranteed to exist because verifyToken middleware ensures it
+      const author = req.user.email;
 
       const article = await Article.findByPk(id);
 
@@ -70,7 +73,8 @@ function registerCommentRoutes(router) {
       const comment = await Comment.create({
         articleId: article.id,
         workspaceId: article.workspaceId,
-        author: author?.trim() || 'Anonymous',
+        author: author,
+        userId: req.user.id,
         content: content.trim(),
       });
 
@@ -95,7 +99,7 @@ function registerCommentRoutes(router) {
   commentRouter.put('/:commentId', async (req, res, next) => {
     try {
       const { id, commentId } = req.params;
-      const { author, content } = req.body;
+      const { content } = req.body;
 
       const comment = await Comment.findOne({
         where: { id: commentId, articleId: id },
@@ -106,6 +110,14 @@ function registerCommentRoutes(router) {
           success: false,
           error: 'Comment not found',
           status: 404,
+        });
+      }
+
+      if (comment.userId !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'You can only edit your own comments',
+          status: 403,
         });
       }
 
@@ -128,7 +140,6 @@ function registerCommentRoutes(router) {
       }
 
       await comment.update({
-        author: author?.trim() || comment.author,
         content: content?.trim() || comment.content,
       });
 
@@ -155,6 +166,17 @@ function registerCommentRoutes(router) {
           success: false,
           error: 'Comment not found',
           status: 404,
+        });
+      }
+
+      const isOwner = comment.userId === req.user.id;
+      const isAdmin = req.user?.role === 'admin';
+
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({
+          success: false,
+          error: 'You can only delete your own comments',
+          status: 403,
         });
       }
 

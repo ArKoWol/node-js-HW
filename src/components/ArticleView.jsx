@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import './ArticleView.css';
 import CommentSection from './CommentSection';
+import { useAuth } from '../contexts/AuthContext';
 
 function ArticleView({
   article,
@@ -16,6 +17,21 @@ function ArticleView({
   onUpdateComment,
   onDeleteComment,
 }) {
+  const { getAuthHeaders, user, isAdmin } = useAuth();
+  
+  const userIsAdmin = isAdmin === true;
+  const userIsCreator = Boolean(
+    article && 
+    user && 
+    article.creatorId && 
+    article.creatorId === user.id
+  );
+  
+  const canEdit = Boolean(article && user && (userIsAdmin || userIsCreator));
+  
+  const canDelete = Boolean(article && user && (userIsAdmin || userIsCreator));
+  
+  const showActions = canEdit || canDelete;
   if (loading) {
     return (
       <div className="loading-container">
@@ -44,10 +60,26 @@ function ArticleView({
   );
   const versionOptions = article.versions || [];
 
-  const handleAttachmentClick = (attachment) => {
+  const handleAttachmentClick = async (attachment) => {
     const API_URL = 'http://localhost:3000/api';
-    const url = `${API_URL}/articles/${article.id}/attachments/${attachment.id}`;
-    window.open(url, '_blank');
+    try {
+      const response = await fetch(`${API_URL}/articles/${article.id}/attachments/${attachment.id}`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        // Clean up the object URL after a delay
+        setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      } else {
+        alert('Failed to load attachment. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error loading attachment:', error);
+      alert('Failed to load attachment. Please try again.');
+    }
   };
 
   const getAttachmentIcon = (mimeType) => {
@@ -179,22 +211,28 @@ function ArticleView({
           className="article-body"
           dangerouslySetInnerHTML={{ __html: displayArticle.content }}
         />
-        <div className="article-actions">
-          <button
-            className="btn btn-primary"
-            onClick={onEdit}
-            disabled={loading || isViewingOldVersion}
-          >
-            Edit Article
-          </button>
-          <button
-            className="btn btn-danger"
-            onClick={() => onDelete(article.id)}
-            disabled={loading}
-          >
-            Delete Article
-          </button>
-        </div>
+        {showActions && (
+          <div className="article-actions">
+            {canEdit && (
+              <button
+                className="btn btn-primary"
+                onClick={onEdit}
+                disabled={loading || isViewingOldVersion}
+              >
+                Edit Article
+              </button>
+            )}
+            {canDelete && (
+              <button
+                className="btn btn-danger"
+                onClick={() => onDelete(article.id)}
+                disabled={loading}
+              >
+                Delete Article
+              </button>
+            )}
+          </div>
+        )}
         {isViewingOldVersion && (
           <p className="read-only-hint">
             Old versions are read-only. Switch back to the latest version to edit.
@@ -220,6 +258,7 @@ ArticleView.propTypes = {
     author: PropTypes.string.isRequired,
     createdAt: PropTypes.string.isRequired,
     updatedAt: PropTypes.string,
+    creatorId: PropTypes.string,
     currentVersionNumber: PropTypes.number,
     versions: PropTypes.arrayOf(
       PropTypes.shape({

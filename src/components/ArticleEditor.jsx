@@ -3,11 +3,12 @@ import PropTypes from 'prop-types';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import './ArticleEditor.css';
+import { useAuth } from '../contexts/AuthContext';
 
 function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit, workspaces, defaultWorkspaceId }) {
+  const { getAuthHeaders } = useAuth();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [author, setAuthor] = useState('');
   const [workspaceId, setWorkspaceId] = useState(defaultWorkspaceId || '');
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -20,7 +21,6 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit, workspace
     if (article && isEdit) {
       setTitle(article.title || '');
       setContent(article.content || '');
-      setAuthor(article.author || '');
       setAttachments(article.attachments || []);
       setWorkspaceId(article.workspace?.id || article.workspaceId || defaultWorkspaceId || '');
     }
@@ -67,8 +67,14 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit, workspace
         `http://localhost:3000/api/articles/${article.id}/attachments/${attachmentId}`,
         {
           method: 'DELETE',
+          headers: getAuthHeaders()
         }
       );
+
+      if (response.status === 401) {
+        setUploadError('Authentication required');
+        return;
+      }
 
       const data = await response.json();
 
@@ -149,7 +155,6 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit, workspace
     const result = await onSubmit({
       title: title.trim(),
       content: content.trim(),
-      author: author.trim() || 'Anonymous',
       workspaceId,
     });
 
@@ -160,7 +165,6 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit, workspace
       if (!isEdit) {
         setTitle('');
         setContent('');
-        setAuthor('');
       }
       setErrors({});
 
@@ -187,6 +191,7 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit, workspace
 
           const response = await fetch(`http://localhost:3000/api/articles/${targetArticleId}/attachments`, {
             method: 'POST',
+            headers: getAuthHeaders(),
             body: formData,
           });
 
@@ -228,18 +233,6 @@ function ArticleEditor({ onSubmit, onCancel, loading, article, isEdit, workspace
             disabled={submitting || loading}
           />
           {errors.title && <span className="error-text">{errors.title}</span>}
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="author">Author</label>
-          <input
-            type="text"
-            id="author"
-            value={author}
-            onChange={(e) => setAuthor(e.target.value)}
-            placeholder="Enter author name (optional)..."
-            disabled={submitting || loading}
-          />
         </div>
 
         <div className="form-group">

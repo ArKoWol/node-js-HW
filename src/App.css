@@ -227,6 +227,51 @@ body {
   pointer-events: all;
 }
 
+.delete-confirmation-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+  backdrop-filter: blur(4px);
+}
+
+.delete-confirmation-dialog {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.delete-confirmation-dialog h3 {
+  margin: 0 0 1rem 0;
+  color: #2d3748;
+  font-size: 1.5rem;
+}
+
+.delete-confirmation-dialog p {
+  margin: 0 0 1.5rem 0;
+  color: #4a5568;
+  line-height: 1.6;
+}
+
+.delete-confirmation-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.delete-confirmation-actions .btn {
+  min-width: 100px;
+}
+
 @media (max-width: 768px) {
   .app-header {
     padding: 1rem;
@@ -258,6 +303,18 @@ body {
   .notification {
     margin: 0 10px;
     max-width: calc(100% - 20px);
+  }
+
+  .delete-confirmation-dialog {
+    padding: 1.5rem;
+  }
+
+  .delete-confirmation-actions {
+    flex-direction: column;
+  }
+
+  .delete-confirmation-actions .btn {
+    width: 100%;
   }
 }
 
