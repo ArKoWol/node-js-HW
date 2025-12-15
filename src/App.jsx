@@ -474,6 +474,50 @@ function App() {
     resetVersionState();
   };
 
+  const handleExportPDF = async (articleId) => {
+    try {
+      const response = await fetch(`${API_URL}/articles/${articleId}/export/pdf`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.status === 401) {
+        logout();
+        return { success: false, error: 'Authentication required' };
+      }
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to export PDF');
+      }
+      
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'article_export.pdf';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      return { success: true };
+    } catch (err) {
+      console.error('Error exporting PDF:', err);
+      setError(err.message);
+      return { success: false, error: err.message };
+    }
+  };
+
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) || null;
   const { user } = useAuth();
 
@@ -600,6 +644,7 @@ function App() {
             onVersionReset={handleVersionReset}
             onEdit={handleEditMode}
             onDelete={handleDeleteArticle}
+            onExportPDF={() => handleExportPDF(selectedArticle.id)}
             onAddComment={(commentData) => handleAddComment(selectedArticle.id, commentData)}
             onUpdateComment={(commentId, commentData) =>
               handleUpdateComment(selectedArticle.id, commentId, commentData)
